@@ -12,6 +12,7 @@ use Puntjes\Enum\ProductStatus;
 use Puntjes\Enum\RedemptionStatus;
 use Puntjes\Enum\RewardType;
 use Puntjes\Exception\ConfigurationException;
+use Puntjes\Exception\TransportException;
 use Puntjes\Request\AdjustWallet;
 use Puntjes\Request\CreateCustomer;
 use Puntjes\Request\CreateIdentifier;
@@ -579,6 +580,19 @@ final class ResourceTest extends TestCase
             'https://pay.google.com/gp/v/save/abc',
             $this->puntjes()->wallets->googlePassUrl(42),
         );
+    }
+
+    public function test_a_google_pass_without_a_save_url_throws_instead_of_returning_an_empty_string(): void
+    {
+        // An empty string here would end up as redirect('') in an integrator's shop.
+        $this->fake->queueData(['unexpected' => 'shape']);
+
+        $puntjes = $this->puntjes();
+
+        $this->expectException(TransportException::class);
+        $this->expectExceptionMessage('no save_url');
+
+        $puntjes->wallets->googlePassUrl(42);
     }
 
     public function test_the_escape_hatch_still_authenticates_and_maps_errors(): void

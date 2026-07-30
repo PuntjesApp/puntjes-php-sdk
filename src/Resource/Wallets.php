@@ -7,6 +7,7 @@ namespace Puntjes\Resource;
 use Puntjes\Enum\WalletPassPlatform;
 use Puntjes\Exception\ApiException;
 use Puntjes\Exception\NotFoundException;
+use Puntjes\Exception\TransportException;
 use Puntjes\Model\LedgerEntry;
 use Puntjes\Model\Wallet;
 use Puntjes\Pagination\Page;
@@ -68,6 +69,11 @@ final class Wallets extends Resource
     /**
      * The signed Apple Wallet pass, as raw `application/vnd.apple.pkpass` bytes.
      *
+     * **Experimental** — the wallet-pass feature is not yet fully integrated on the
+     * Puntjes side; expect this endpoint to change. Verify it against your target
+     * environment before shipping, and give your HTTP client a request timeout: an
+     * instance whose pass integration is incomplete can hang rather than error.
+     *
      * The only endpoint that does not answer JSON. Serve the bytes with that content
      * type and a `.pkpass` filename; iOS opens Wallet from there. The balance is
      * rendered fresh on every call, so passes are never stale.
@@ -83,8 +89,15 @@ final class Wallets extends Resource
     /**
      * The Google Wallet save URL to redirect the customer to.
      *
+     * **Experimental** — same caveat as {@see applePass()}: the wallet-pass feature
+     * is not yet fully integrated on the Puntjes side. Verify before shipping and
+     * configure a client timeout.
+     *
      * Google returns a link rather than a file — this is a URL to send the customer
      * to, not a redirect the SDK follows.
+     *
+     * @throws TransportException when the response carries no usable save URL, so a
+     *                            caller can never end up redirecting a customer to "".
      */
     public function googlePassUrl(int $customerId): string
     {
@@ -93,6 +106,14 @@ final class Wallets extends Resource
             ['platform' => WalletPassPlatform::Google->value],
         )->dataArray();
 
-        return is_string($data['save_url'] ?? null) ? $data['save_url'] : '';
+        $saveUrl = $data['save_url'] ?? null;
+
+        if (! is_string($saveUrl) || $saveUrl === '') {
+            throw new TransportException(
+                'The Puntjes API returned no save_url for the Google wallet pass — the wallet-pass integration may not be configured on this instance.',
+            );
+        }
+
+        return $saveUrl;
     }
 }

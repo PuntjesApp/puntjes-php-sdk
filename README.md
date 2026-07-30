@@ -197,8 +197,8 @@ $puntjes->transactions->forCustomer(42, new DateRangeFilters(dateFrom: '2026-07-
 $puntjes->wallets->show(42);
 $puntjes->wallets->ledger(42, new DateRangeFilters(type: 'earn'));
 $puntjes->wallets->adjust(42, AdjustWallet::credit(100, 'Goodwill'));
-$puntjes->wallets->applePass(42);        // raw .pkpass bytes
-$puntjes->wallets->googlePassUrl(42);    // save URL to redirect to
+$puntjes->wallets->applePass(42);        // raw .pkpass bytes — EXPERIMENTAL, see below
+$puntjes->wallets->googlePassUrl(42);    // save URL to redirect to — EXPERIMENTAL, see below
 
 // Rewards & redemptions
 $puntjes->rewards->list();
@@ -224,6 +224,16 @@ $puntjes->statistics->get(Period::ThirtyDays);
 $puntjes->me();
 $puntjes->ping();   // unauthenticated health check
 ```
+
+### Wallet passes (experimental)
+
+`applePass()` and `googlePassUrl()` target `GET /customers/{id}/wallet-pass`, a
+feature that is **not yet fully integrated on the Puntjes side**. Treat both as
+experimental: verify them against your target environment before shipping, and give
+your HTTP client a request timeout — an instance whose pass integration is incomplete
+can hang rather than fail. `googlePassUrl()` throws a `TransportException` when the
+response carries no usable save URL, so you can never end up redirecting a customer
+to an empty string.
 
 ### Catalogue sync
 
