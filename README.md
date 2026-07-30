@@ -30,7 +30,7 @@ use Puntjes\Request\SubmitTransaction;
 $puntjes = Puntjes::make(
     clientId:     getenv('PUNTJES_CLIENT_ID'),
     clientSecret: getenv('PUNTJES_CLIENT_SECRET'),
-    baseUrl:      'https://app.puntjes.app',   // the app root, NOT /api/v1
+    baseUrl:      'https://puntjes.app/api/v1',
 );
 
 // A customer scans their card at the till.
@@ -54,6 +54,21 @@ Credentials come from **Puntjes → Settings → API clients**. The secret is sh
 Authentication is handled for you: a `client_credentials` token is fetched on the
 first call, cached until it expires, and silently re-fetched once if the API ever
 rejects it.
+
+### Base URL
+
+Pass the base URL exactly as the [API docs](https://docs.puntjes.app) state it —
+`https://puntjes.app/api/v1`. The bare host works too; both are accepted and
+equivalent:
+
+```php
+baseUrl: 'https://puntjes.app/api/v1'   // as documented
+baseUrl: 'https://puntjes.app'          // same thing
+```
+
+Internally the SDK keeps only the host, because the two endpoints it talks to do not
+share a prefix: the API is under `/api/v1`, but the OAuth token endpoint is at
+`/oauth/token`, off the root.
 
 ## Amounts are in cents
 

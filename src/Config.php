@@ -9,9 +9,15 @@ use Puntjes\Exception\ConfigurationException;
 /**
  * Immutable client configuration.
  *
- * `$baseUrl` is the Puntjes application root — NOT the API prefix. Both the API
- * (`/api/v1`) and the OAuth token endpoint (`/oauth/token`) hang off it, and a
- * client configured with only the API prefix could never reach the token route.
+ * `$baseUrl` accepts the base URL exactly as the API documentation states it —
+ * `https://puntjes.app/api/v1` — or the bare host, `https://puntjes.app`. Both are
+ * equivalent here.
+ *
+ * Internally only the host is kept, because the two things this client talks to do
+ * not share a prefix: the API lives under `/api/v1`, but the OAuth token endpoint is
+ * at `/oauth/token`, off the root. A client that stored the documented base URL
+ * verbatim and appended paths to it would look for the token at
+ * `/api/v1/oauth/token` and never find it.
  */
 final class Config
 {
@@ -27,7 +33,7 @@ final class Config
     /**
      * @param  string  $clientId  OAuth client id from Puntjes → Settings → API clients.
      * @param  string  $clientSecret  The matching client secret. Never logged.
-     * @param  string  $baseUrl  Application root, e.g. https://app.puntjes.app
+     * @param  string  $baseUrl  `https://puntjes.app/api/v1` or `https://puntjes.app` — either works.
      * @param  int  $maxRetries  Retries per request for retry-safe calls. 0 disables retrying.
      * @param  float  $retryBaseDelay  Seconds for the first backoff step; doubles per attempt.
      * @param  array<string, string>  $defaultHeaders  Sent on every request (e.g. a User-Agent).
@@ -54,9 +60,10 @@ final class Config
             throw new ConfigurationException(sprintf('"%s" is not a valid Puntjes base URL.', $baseUrl));
         }
 
-        // A base URL that already ends in the API prefix is the single most likely
-        // misconfiguration: it silently yields /api/v1/api/v1/... and an unreachable
-        // token endpoint. Normalise it away rather than failing at request time.
+        // The documented base URL ends in /api/v1, so that is what an integrator will
+        // paste. Strip it back to the host: apiUrl() re-adds the prefix, and tokenUrl()
+        // needs a host without it. Accepting both forms is deliberate — this is not
+        // error recovery.
         if (str_ends_with($trimmed, self::API_PREFIX)) {
             $trimmed = substr($trimmed, 0, -strlen(self::API_PREFIX));
         }

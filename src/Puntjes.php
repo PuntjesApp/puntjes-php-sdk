@@ -31,7 +31,7 @@ use Puntjes\Resource\Wallets;
  *     $puntjes = Puntjes::make(
  *         clientId: getenv('PUNTJES_CLIENT_ID'),
  *         clientSecret: getenv('PUNTJES_CLIENT_SECRET'),
- *         baseUrl: 'https://app.puntjes.app',
+ *         baseUrl:      'https://puntjes.app/api/v1',
  *     );
  *
  *     $customer = $puntjes->customers->lookup(identifier: $scannedCard);
@@ -86,7 +86,8 @@ final class Puntjes
     /**
      * Build a client from credentials, wiring up sensible defaults.
      *
-     * @param  string  $baseUrl  Application root, e.g. `https://app.puntjes.app` — not the `/api/v1` prefix.
+     * @param  string  $baseUrl  The base URL from the API docs, `https://puntjes.app/api/v1`.
+     *                           The bare host works too — see {@see Config}.
      * @param  TokenStore|null  $tokenStore  Defaults to per-process caching. Pass a shared
      *                                       store (Laravel cache, WP transients) in a web app.
      * @param  ClientInterface|null  $httpClient  Any PSR-18 client. Auto-discovered when omitted;
