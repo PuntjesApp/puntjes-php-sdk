@@ -1,0 +1,53 @@
+{
+    "name": "puntjes/php-sdk",
+    "description": "Framework-agnostic PHP client for the Puntjes loyalty API.",
+    "type": "library",
+    "keywords": ["puntjes", "loyalty", "sdk", "api", "psr-18"],
+    "homepage": "https://github.com/TheGangOfFour/puntjes-php-sdk",
+    "license": "MIT",
+    "support": {
+        "issues": "https://github.com/TheGangOfFour/puntjes-php-sdk/issues",
+        "docs": "https://docs.puntjes.app"
+    },
+    "require": {
+        "php": "^8.1",
+        "psr/http-client": "^1.0",
+        "psr/http-factory": "^1.0",
+        "psr/http-message": "^1.1 || ^2.0",
+        "php-http/discovery": "^1.19"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.17",
+        "nyholm/psr7": "^1.8",
+        "php-http/mock-client": "^1.6",
+        "phpstan/phpstan": "^1.11",
+        "phpunit/phpunit": "^10.5",
+        "symfony/http-client": "^6.4 || ^7.0"
+    },
+    "suggest": {
+        "guzzlehttp/guzzle": "A PSR-18 client implementation, if your project does not already ship one."
+    },
+    "autoload": {
+        "psr-4": {
+            "Puntjes\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Puntjes\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "analyse": "phpstan analyse",
+        "format": "pint"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

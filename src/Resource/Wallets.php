@@ -1,0 +1,98 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Puntjes\Resource;
+
+use Puntjes\Enum\WalletPassPlatform;
+use Puntjes\Exception\ApiException;
+use Puntjes\Exception\NotFoundException;
+use Puntjes\Model\LedgerEntry;
+use Puntjes\Model\Wallet;
+use Puntjes\Pagination\Page;
+use Puntjes\Pagination\Paginator;
+use Puntjes\Request\AdjustWallet;
+use Puntjes\Request\DateRangeFilters;
+
+/** Balances, the points ledger, manual corrections, and wallet passes. */
+final class Wallets extends Resource
+{
+    /**
+     * The customer's current balance, plus how many points expire within 30 days.
+     *
+     * @throws NotFoundException `CUSTOMER_NOT_FOUND` or `WALLET_NOT_FOUND`.
+     */
+    public function show(int $customerId): Wallet
+    {
+        return Wallet::fromArray(
+            $this->transport->get('/customers/'.$this->segment($customerId).'/wallet')->dataArray(),
+        );
+    }
+
+    /**
+     * The append-only points ledger, newest first, 15 per page.
+     *
+     * Filter by entry type with `new DateRangeFilters(type: 'earn')`.
+     *
+     * @return Paginator<LedgerEntry>
+     */
+    public function ledger(int $customerId, ?DateRangeFilters $filters = null): Paginator
+    {
+        $query = $filters?->toQuery() ?? [];
+        $path = '/customers/'.$this->segment($customerId).'/ledger';
+
+        return new Paginator(fn (int $page): Page => Page::fromResponse(
+            $this->transport->get($path, $query + ['page' => $page]),
+            LedgerEntry::fromArray(...),
+        ));
+    }
+
+    /**
+     * Credit or debit points manually, returning the resulting ledger entry.
+     *
+     * Safe to retry: replaying the idempotency key returns the original entry
+     * without moving the balance again.
+     *
+     * @throws ApiException (`INSUFFICIENT_BALANCE`, 422) when a debit exceeds the balance.
+     */
+    public function adjust(int $customerId, AdjustWallet $adjustment): LedgerEntry
+    {
+        return LedgerEntry::fromArray(
+            $this->transport->post(
+                '/customers/'.$this->segment($customerId).'/wallet/adjust',
+                $adjustment->toArray(),
+            )->dataArray(),
+        );
+    }
+
+    /**
+     * The signed Apple Wallet pass, as raw `application/vnd.apple.pkpass` bytes.
+     *
+     * The only endpoint that does not answer JSON. Serve the bytes with that content
+     * type and a `.pkpass` filename; iOS opens Wallet from there. The balance is
+     * rendered fresh on every call, so passes are never stale.
+     */
+    public function applePass(int $customerId): string
+    {
+        return $this->transport->get(
+            '/customers/'.$this->segment($customerId).'/wallet-pass',
+            ['platform' => WalletPassPlatform::Apple->value],
+        )->body;
+    }
+
+    /**
+     * The Google Wallet save URL to redirect the customer to.
+     *
+     * Google returns a link rather than a file — this is a URL to send the customer
+     * to, not a redirect the SDK follows.
+     */
+    public function googlePassUrl(int $customerId): string
+    {
+        $data = $this->transport->get(
+            '/customers/'.$this->segment($customerId).'/wallet-pass',
+            ['platform' => WalletPassPlatform::Google->value],
+        )->dataArray();
+
+        return is_string($data['save_url'] ?? null) ? $data['save_url'] : '';
+    }
+}
