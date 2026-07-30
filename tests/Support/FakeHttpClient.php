@@ -27,7 +27,7 @@ final class FakeHttpClient implements ClientInterface
     /** @var array<int, ResponseInterface|ClientExceptionInterface> */
     private array $apiQueue = [];
 
-    /** @var array<int, ResponseInterface> */
+    /** @var array<int, ResponseInterface|ClientExceptionInterface> */
     private array $tokenQueue = [];
 
     /** @var array<int, RequestInterface> */
@@ -130,13 +130,27 @@ final class FakeHttpClient implements ClientInterface
     }
 
     /**
-     * Queue a failing token grant — the OAuth2 flat error shape, not the API envelope.
+     * Queue a failing token grant. 400/401 use OAuth2's flat error shape; anything
+     * else from the real endpoint carries the standard API envelope.
      *
      * @param  array<string, mixed>  $json
+     * @param  array<string, string>  $headers
      */
-    public function queueTokenFailure(int $status, array $json): self
+    public function queueTokenFailure(int $status, array $json, array $headers = []): self
     {
-        $this->tokenQueue[] = new Response($status, ['Content-Type' => 'application/json'], (string) json_encode($json));
+        $this->tokenQueue[] = new Response(
+            $status,
+            $headers + ['Content-Type' => 'application/json'],
+            (string) json_encode($json),
+        );
+
+        return $this;
+    }
+
+    /** Queue a connection-level failure on the next token grant. */
+    public function queueTokenNetworkFailure(string $message = 'Connection refused'): self
+    {
+        $this->tokenQueue[] = new FakeNetworkException($message);
 
         return $this;
     }
@@ -147,7 +161,13 @@ final class FakeHttpClient implements ClientInterface
         $this->bodies[] = (string) $request->getBody();
 
         if (str_ends_with($request->getUri()->getPath(), '/oauth/token')) {
-            return array_shift($this->tokenQueue) ?? $this->defaultToken();
+            $next = array_shift($this->tokenQueue) ?? $this->defaultToken();
+
+            if ($next instanceof ClientExceptionInterface) {
+                throw $next;
+            }
+
+            return $next;
         }
 
         if ($this->apiQueue === []) {

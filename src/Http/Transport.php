@@ -7,6 +7,7 @@ namespace Puntjes\Http;
 use Puntjes\Auth\TokenProvider;
 use Puntjes\Config;
 use Puntjes\Exception\ApiException;
+use Puntjes\Exception\AuthenticationException;
 use Puntjes\Exception\PlanLimitExceededException;
 use Puntjes\Exception\RateLimitException;
 use Puntjes\Exception\ServerException;
@@ -43,6 +44,12 @@ use Puntjes\Exception\TransportException;
  * A 401 triggers exactly one silent re-grant and replay, which is what makes a token
  * cached across processes safe: if it was revoked or expired early, the next call
  * transparently mints a new one. A second 401 is raised — the credentials are wrong.
+ *
+ * A grant that fails *transiently* (connection error, 5xx, 429 on the token route) is
+ * retried under the same budget as the request itself — and, unlike the request, it is
+ * retried regardless of method: the grant failing means the actual request was never
+ * sent, so replaying it cannot duplicate a side effect. Only a credential rejection
+ * ({@see AuthenticationException}) is never retried.
  */
 final class Transport
 {
@@ -119,9 +126,27 @@ final class Transport
 
         $attempt = 0;
         $tokenRefreshed = false;
+        $forceRefresh = false;
 
         while (true) {
-            $token = $this->tokens->token(forceRefresh: false);
+            try {
+                $token = $this->tokens->token(forceRefresh: $forceRefresh);
+                $forceRefresh = false;
+            } catch (TransportException|ServerException|RateLimitException $e) {
+                // The grant failed before the actual request was ever sent, so a retry
+                // is side-effect-free no matter what the request is — replaying a
+                // failed grant for POST /customers cannot duplicate a customer.
+                // AuthenticationException deliberately falls through: rejected
+                // credentials are not transient.
+                if ($attempt < $this->config->maxRetries) {
+                    $this->sleep($attempt, $e instanceof RateLimitException ? $e->retryAfter() : null);
+                    $attempt++;
+
+                    continue;
+                }
+
+                throw $e;
+            }
 
             $requestHeaders = array_merge(
                 $this->config->defaultHeaders,
@@ -154,10 +179,12 @@ final class Transport
 
             // One silent re-grant: the cached token was revoked, or the server restarted
             // with new Passport keys. Replaying is safe regardless of method — a 401 means
-            // the request was rejected before reaching any business logic.
+            // the request was rejected before reaching any business logic. The refresh
+            // itself happens at the top of the loop, inside the guarded path, so a
+            // transient failure during the re-grant is retried too.
             if ($response->status === 401 && ! $tokenRefreshed) {
                 $tokenRefreshed = true;
-                $this->tokens->token(forceRefresh: true);
+                $forceRefresh = true;
 
                 continue;
             }

@@ -6,7 +6,9 @@ namespace Puntjes\Auth;
 
 use Puntjes\Config;
 use Puntjes\Exception\AuthenticationException;
+use Puntjes\Exception\PuntjesException;
 use Puntjes\Exception\TransportException;
+use Puntjes\Http\ErrorMapper;
 use Puntjes\Http\HttpClient;
 use Puntjes\Http\Response;
 
@@ -96,33 +98,49 @@ final class ClientCredentialsProvider implements TokenProvider
     }
 
     /**
-     * The token endpoint is OAuth2's, not the Puntjes API's, so it answers with
-     * `{"error": "invalid_client", "error_description": …}` — a flat string error,
-     * not the `{"error": {"code", …}}` envelope every other endpoint uses. Translate
-     * it so callers get one consistent exception type either way.
+     * Only a 400/401 from the token endpoint means the credentials were rejected —
+     * and only those answer in OAuth2's flat `{"error": "invalid_client",
+     * "error_description": …}` shape (league/oauth2-server, not the API envelope).
      *
-     * Credentials are never included in the message.
+     * Everything else — a 429 from the token route's throttle, a 5xx, a proxy error
+     * page — is an infrastructure problem, not a credential one. Those are mapped
+     * exactly like any API response, so `ServerException` / `RateLimitException` keep
+     * their meaning and the transport's retry policy applies to them. Typing a 502 as
+     * an authentication failure would send an operator hunting for a credentials bug
+     * during an outage.
+     *
+     * Credentials are never included in any message.
      */
-    private function grantFailure(Response $response): AuthenticationException
+    private function grantFailure(Response $response): PuntjesException
     {
-        $body = $response->tryJson() ?? [];
+        if ($response->status === 400 || $response->status === 401) {
+            $body = $response->tryJson() ?? [];
 
-        $code = is_string($body['error'] ?? null) ? $body['error'] : 'invalid_client';
-        $description = is_string($body['error_description'] ?? null)
-            ? $body['error_description']
-            : 'The Puntjes API rejected the client credentials.';
+            $code = is_string($body['error'] ?? null) ? $body['error'] : 'invalid_client';
+            $description = is_string($body['error_description'] ?? null)
+                ? $body['error_description']
+                : 'The Puntjes API rejected the client credentials.';
 
-        $hint = $response->status === 401
-            ? ' Check PUNTJES_CLIENT_ID / PUNTJES_CLIENT_SECRET, and that the API client has not been revoked.'
-            : '';
+            return new AuthenticationException(
+                message: sprintf(
+                    'OAuth token request failed (HTTP %d): %s. Check PUNTJES_CLIENT_ID / PUNTJES_CLIENT_SECRET, and that the API client has not been revoked.',
+                    $response->status,
+                    $description,
+                ),
+                status: $response->status,
+                errorCode: strtoupper($code),
+                requestId: $response->header('x-request-id'),
+                details: null,
+                body: $body,
+            );
+        }
 
-        return new AuthenticationException(
-            message: sprintf('OAuth token request failed (HTTP %d): %s.%s', $response->status, $description, $hint),
-            status: $response->status,
-            errorCode: strtoupper($code),
-            requestId: $response->header('x-request-id'),
-            details: null,
-            body: $body,
-        );
+        try {
+            return ErrorMapper::toException($response);
+        } catch (TransportException $e) {
+            // Non-JSON below 500 — a WAF or login page where the token endpoint
+            // should be. Not retryable, but not an auth failure either.
+            return $e;
+        }
     }
 }

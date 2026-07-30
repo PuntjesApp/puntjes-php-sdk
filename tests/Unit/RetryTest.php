@@ -198,6 +198,17 @@ final class RetryTest extends TestCase
         }
     }
 
+    public function test_a_non_json_5xx_from_a_proxy_is_retried(): void
+    {
+        // The most common transient failure in production: a load balancer answering
+        // HTML for a backend that is restarting. It must be retried like a JSON 5xx.
+        $this->fake->queueRaw(502, '<html><body>Bad Gateway</body></html>', ['Content-Type' => 'text/html']);
+        $this->fake->queueData(['display_name' => 'Bakkerij Jan']);
+
+        self::assertSame('Bakkerij Jan', $this->puntjes()->me()->displayName);
+        self::assertSame([0.5], $this->sleeps);
+    }
+
     public function test_a_connection_failure_that_never_recovers_surfaces_as_a_transport_exception(): void
     {
         $this->fake->queueNetworkFailure();

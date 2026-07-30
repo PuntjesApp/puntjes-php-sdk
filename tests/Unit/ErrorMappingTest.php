@@ -115,11 +115,12 @@ final class ErrorMappingTest extends TestCase
         }
     }
 
-    public function test_a_non_json_error_page_is_a_transport_problem_not_an_api_error(): void
+    public function test_a_non_json_4xx_error_page_is_a_transport_problem_not_an_api_error(): void
     {
-        // A proxy or WAF answering HTML means the request never reached Puntjes.
-        // Inventing an error code for it would send integrators hunting the wrong bug.
-        $this->fake->queueRaw(502, '<html><body>Bad Gateway</body></html>', ['Content-Type' => 'text/html']);
+        // A WAF block page or login redirect answering HTML means the request never
+        // reached Puntjes. Inventing an error code for it would send integrators
+        // hunting the wrong bug — and it must never be retried.
+        $this->fake->queueRaw(403, '<html><body>Access denied</body></html>', ['Content-Type' => 'text/html']);
 
         $puntjes = $this->puntjes(maxRetries: 0);
 
@@ -127,6 +128,26 @@ final class ErrorMappingTest extends TestCase
         $this->expectExceptionMessage('non-JSON error response');
 
         $puntjes->me();
+    }
+
+    public function test_a_non_json_5xx_maps_to_a_server_error(): void
+    {
+        // An HTML 502 from a load balancer is a failing backend, not a wrong host —
+        // it must carry the retryable ServerException type, with a synthetic code
+        // that can never be mistaken for one the API emits.
+        $this->fake->queueRaw(502, '<html><body>Bad Gateway</body></html>', ['Content-Type' => 'text/html']);
+
+        $puntjes = $this->puntjes(maxRetries: 0);
+
+        try {
+            $puntjes->me();
+            self::fail('Expected a ServerException.');
+        } catch (ServerException $e) {
+            self::assertSame(502, $e->status());
+            self::assertSame('NON_JSON_RESPONSE', $e->code());
+            self::assertNull($e->errorCode());
+            self::assertStringContainsString('Bad Gateway', $e->getMessage());
+        }
     }
 
     public function test_a_success_body_without_the_data_envelope_is_rejected(): void

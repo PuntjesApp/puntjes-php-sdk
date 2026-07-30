@@ -10,7 +10,10 @@ use Puntjes\Auth\ClientCredentialsProvider;
 use Puntjes\Auth\InMemoryTokenStore;
 use Puntjes\Config;
 use Puntjes\Exception\AuthenticationException;
+use Puntjes\Exception\ServerException;
 use Puntjes\Http\HttpClient;
+use Puntjes\Request\CreateCustomer;
+use Puntjes\Request\CreateIdentifier;
 use Puntjes\Tests\Support\TestCase;
 
 final class AuthenticationTest extends TestCase
@@ -158,5 +161,101 @@ final class AuthenticationTest extends TestCase
         self::assertTrue($this->puntjes()->ping());
         self::assertSame(1, $this->fake->requestCount());
         self::assertFalse($this->fake->requestAt(0)->hasHeader('Authorization'));
+    }
+
+    public function test_a_transient_grant_failure_is_retried_under_the_normal_policy(): void
+    {
+        $this->fake->queueTokenFailure(500, [
+            'error' => ['code' => 'INTERNAL_ERROR', 'message' => 'An unexpected error occurred.', 'status' => 500, 'request_id' => 'r1'],
+        ]);
+        $this->fake->queueToken('tok-after-blip');
+        $this->fake->queueData(['display_name' => 'Bakkerij Jan']);
+
+        $branding = $this->puntjes()->me();
+
+        self::assertSame('Bakkerij Jan', $branding->displayName);
+        self::assertSame([0.5], $this->sleeps);
+        self::assertSame('Bearer tok-after-blip', $this->fake->requestAt(2)->getHeaderLine('Authorization'));
+    }
+
+    public function test_a_connection_failure_during_the_grant_is_retried(): void
+    {
+        $this->fake->queueTokenNetworkFailure();
+        $this->fake->queueData(['display_name' => 'Bakkerij Jan']);
+
+        self::assertSame('Bakkerij Jan', $this->puntjes()->me()->displayName);
+        self::assertSame([0.5], $this->sleeps);
+    }
+
+    public function test_a_rate_limited_grant_honours_retry_after(): void
+    {
+        $this->fake->queueTokenFailure(
+            429,
+            ['error' => ['code' => 'RATE_LIMITED', 'message' => 'Too many requests.', 'status' => 429, 'request_id' => 'r1']],
+            ['Retry-After' => '3'],
+        );
+        $this->fake->queueData(['display_name' => 'Bakkerij Jan']);
+
+        $this->puntjes()->me();
+
+        self::assertSame([3.0], $this->sleeps);
+    }
+
+    public function test_grant_failures_are_retried_even_for_posts_without_idempotency_keys(): void
+    {
+        // The grant failing means POST /customers was never sent, so replaying it
+        // cannot create a duplicate — the request's own no-retry rule must not apply.
+        $this->fake->queueTokenFailure(500, [
+            'error' => ['code' => 'INTERNAL_ERROR', 'message' => 'An unexpected error occurred.', 'status' => 500, 'request_id' => 'r1'],
+        ]);
+        $this->fake->queueData(['id' => 7], 201);
+
+        $customer = $this->puntjes()->customers->register(new CreateCustomer(
+            identifiers: [CreateIdentifier::card('CARD-NEW')],
+        ));
+
+        self::assertSame(7, $customer->id);
+        self::assertSame([0.5], $this->sleeps);
+        // Exactly one actual API request — the retry replayed the grant, not the POST.
+        self::assertSame(1, $this->fake->apiRequestCount());
+    }
+
+    public function test_a_grant_5xx_is_a_server_error_not_an_authentication_failure(): void
+    {
+        // Typing an outage as an auth failure sends an operator hunting for a
+        // credentials bug during an incident.
+        $this->fake->queueTokenFailure(500, [
+            'error' => ['code' => 'INTERNAL_ERROR', 'message' => 'An unexpected error occurred.', 'status' => 500, 'request_id' => 'r1'],
+        ]);
+
+        $puntjes = $this->puntjes(maxRetries: 0);
+
+        try {
+            $puntjes->me();
+            self::fail('Expected a ServerException.');
+        } catch (ServerException $e) {
+            self::assertSame('INTERNAL_ERROR', $e->code());
+            self::assertSame(500, $e->status());
+        }
+    }
+
+    public function test_rejected_credentials_are_never_retried(): void
+    {
+        $this->fake->queueTokenFailure(401, [
+            'error' => 'invalid_client',
+            'error_description' => 'Client authentication failed',
+        ]);
+
+        $puntjes = $this->puntjes();
+
+        $this->expectException(AuthenticationException::class);
+
+        try {
+            $puntjes->me();
+        } finally {
+            // One grant attempt, no sleeps: bad credentials are not transient.
+            self::assertSame(1, $this->fake->requestCount());
+            self::assertSame([], $this->sleeps);
+        }
     }
 }

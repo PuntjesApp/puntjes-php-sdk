@@ -25,13 +25,36 @@ use Puntjes\Exception\ValidationException;
  */
 final class ErrorMapper
 {
+    /**
+     * @throws TransportException when the body is not JSON and the status is below
+     *                            500 — the SDK is not talking to the Puntjes API at
+     *                            all, and no retry or error code applies.
+     */
     public static function toException(Response $response): ApiException
     {
         $body = $response->tryJson();
 
         if ($body === null) {
-            // Not the API's envelope: a proxy, a WAF, or the wrong host. Say so plainly
-            // rather than inventing an error code that does not exist.
+            // A non-JSON 5xx is almost always a proxy or load balancer answering for a
+            // backend that is down — the most common transient failure in production.
+            // Type it as a server error so the retry policy treats it like one. The
+            // NON_JSON_RESPONSE code is synthetic (this SDK's, not the API's), so it is
+            // deliberately absent from the ErrorCode enum.
+            if ($response->status >= 500) {
+                return new ServerException(
+                    sprintf(
+                        'The Puntjes API returned HTTP %d with a non-JSON body — likely a proxy or load balancer answering for a failing backend: %s',
+                        $response->status,
+                        $response->bodyExcerpt(),
+                    ),
+                    $response->status,
+                    'NON_JSON_RESPONSE',
+                );
+            }
+
+            // Below 500, a non-JSON body means the SDK is not talking to the Puntjes
+            // API at all (wrong base URL, a login redirect, a WAF page). Say so plainly
+            // rather than inventing an error code — and never retry it.
             throw new TransportException(sprintf(
                 'The Puntjes API returned a non-JSON error response (HTTP %d): %s',
                 $response->status,
