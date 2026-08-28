@@ -93,6 +93,9 @@ customers, so the SDK is deliberately conservative about what it replays.
 | `POST /customers` | ❌ | A replay would create a second customer |
 | `POST /products`, `/products/batch`, `/products/{sku}/reward` | ❌ | No replay protection |
 | `POST /redemptions/{code}/verify` | ❌ | A replay would answer `CODE_ALREADY_USED` |
+| `POST /vouchers/{code}/verify` | ❌ | Verifying a bon *spends* it; a replay answers `VOUCHER_ALREADY_USED` |
+| `POST …/send-card` | ❌ | A replay emails the customer a second time |
+| `POST /customers/link-external-id` | ❌ | No idempotency key — though re-sending the *same* external id is safe if you retry yourself |
 
 Retries fire only on failures a later attempt could survive — connection errors, 5xx,
 and `429 RATE_LIMITED` — with exponential backoff, honouring `Retry-After`.
@@ -114,6 +117,83 @@ new SubmitTransaction(
 
 Keys are scoped per vendor. Reusing one for a different customer or reward returns
 `IDEMPOTENCY_KEY_CONFLICT` rather than someone else's confirmation code.
+
+## Branches
+
+A vendor can run several shops, and the API can record which one a purchase, a
+redemption or a bon happened at. A branch is addressed by the **key the vendor chose**
+in the portal — never by a Puntjes id — so nothing here asks your system to store a
+primary key it would then have to keep in step.
+
+### Naming a branch on a write
+
+```php
+$puntjes->transactions->submit(new SubmitTransaction(
+    identifier:  $scannedCard,
+    totalAmount: 4200,
+    branch:      'centrum',
+));
+
+$puntjes->redemptions->create(new CreateRedemption('CARD-1', rewardId: 3, branch: 'centrum'));
+$puntjes->vouchers->verify('BON-ABC12345', branch: 'centrum');
+```
+
+The API resolves it in one order: **the payload, then the branch your API credential
+defaults to, then no branch at all.** A till that only ever serves one shop is better
+configured once — set the default branch on its credential in *Settings → API clients* —
+than made to send `branch:` on every call.
+
+Two ways it can be wrong, kept deliberately distinct so you can tell them apart:
+
+| Code | Meaning |
+|---|---|
+| `BRANCH_NOT_FOUND` | The key names no branch this vendor has. You typed it wrong. |
+| `BRANCH_INACTIVE` | The vendor closed that shop. Only `POST /transactions` raises it. |
+| `BRANCH_REQUIRED` | The reward or bon is limited to particular branches, and this is not one. |
+
+All three are 422 and nothing is recorded.
+
+### Reading a branch back
+
+```php
+$transaction->branch?->name;       // "Centrum", or null for the Unassigned bucket
+$transaction->branch?->externalId; // "centrum" — the key to send back
+$transaction->branch?->type;       // BranchType::Physical
+```
+
+Rewards and campaigns carry the branches they are limited to. **`null` and `[]` mean
+opposite things and are never collapsed:**
+
+```php
+$reward->branches === null   // redeemable anywhere
+$reward->branches === []     // scoped, but every shop it named has since been deleted
+$reward->isRedeemableEverywhere();
+$campaign->runsEverywhere();
+```
+
+### Filtering a report
+
+```php
+use Puntjes\Model\Branch;
+
+$puntjes->statistics->get(Period::ThirtyDays, branch: 'centrum');
+$puntjes->statistics->get(Period::ThirtyDays, branch: Branch::UNASSIGNED);  // 'none'
+$puntjes->campaigns->list(branch: 'centrum');
+```
+
+There are three states here, not two: **omitting** `branch` covers the whole vendor,
+`Branch::UNASSIGNED` covers only what was recorded against no branch, and a key covers
+that one shop. A mistyped key is refused with `BRANCH_NOT_FOUND` rather than answered
+vendor-wide — a report that silently widens under a branch label is the one mistake
+nobody catches by reading it.
+
+`Branch::UNASSIGNED` is a **filter word only**. On a write it is an unknown key, because
+a purchase has to have happened somewhere.
+
+> Under a branch filter, `$stats->loyalty` is **null**. Points liability is a wallet
+> snapshot and breakage is a ratio whose halves come from different populations —
+> neither narrows to one shop, so the API omits the block rather than printing a
+> vendor-wide number beside branch-filtered sales. Check for null before reading it.
 
 ## Errors
 
@@ -188,6 +268,9 @@ $puntjes->customers->findByExternalId('PNU-1');
 $puntjes->customers->register(new CreateCustomer(...));
 $puntjes->customers->find(42);
 $puntjes->customers->updateByExternalId('PNU-1', new UpdateCustomer(email: 'new@example.com'));
+$puntjes->customers->linkExternalId('CARD-1', 'PNU-1');   // backfill a legacy customer
+$puntjes->customers->sendCard(42);                        // email them their loyalty card
+$puntjes->customers->sendCardByExternalId('PNU-1');
 
 // Transactions
 $puntjes->transactions->submit(new SubmitTransaction(...));
@@ -207,6 +290,9 @@ $puntjes->redemptions->create(new CreateRedemption('CARD-1', rewardId: 3));
 $puntjes->redemptions->find('PNTJ-ABC123');
 $puntjes->redemptions->verify('PNTJ-ABC123');
 
+// Campaign bonnen — the vouchers a campaign gives away. Verifying SPENDS one.
+$puntjes->vouchers->verify('BON-ABC12345');
+
 // Products — keyed on YOUR SKU, never on a Puntjes id
 $puntjes->products->list(new ProductFilters(category: 'Bakery'));
 $puntjes->products->create(new CreateProduct(externalId: 'SKU-1', name: 'Brood'));
@@ -220,7 +306,9 @@ $puntjes->products->createReward('SKU-1', new CreateRewardFromProduct(pointCost:
 
 // Campaigns, statistics, vendor
 $puntjes->campaigns->list();
+$puntjes->campaigns->list(branch: 'centrum');
 $puntjes->statistics->get(Period::ThirtyDays);
+$puntjes->statistics->get(Period::ThirtyDays, branch: 'centrum');
 $puntjes->me();
 $puntjes->ping();   // unauthenticated health check
 ```
@@ -271,6 +359,39 @@ PATCH requests distinguish "leave this alone" from "clear this", so the defaults
 new UpdateCustomer(email: 'new@example.com')  // changes only the email
 new UpdateCustomer(phone: null)               // clears the phone number
 ```
+
+### Customer consent and the loyalty card code
+
+Registration returns the customer's card code at the top level — persist it as their QR
+value rather than digging it back out of the identifier list:
+
+```php
+$customer = $puntjes->customers->register($new);
+$customer->loyaltyCardCode;   // "PNTJ-…"
+```
+
+Marketing consent comes back decided, with the provenance behind it, so nothing has to
+re-implement the grant-versus-withdrawal rule:
+
+```php
+$customer->hasMarketingConsent();                    // true
+$customer->marketingConsent->grantedAt;              // "2026-03-03T09:00:00+00:00"
+$customer->marketingConsent->grantedSource;          // "webshop"
+
+new CreateCustomer(identifiers: [...], marketingConsent: true);
+new UpdateCustomer(marketingConsent: false);         // records a withdrawal
+new UpdateCustomer();                                // leaves consent exactly as it was
+```
+
+Only send `true` when the customer actually opted in on your side — this is the record
+the vendor relies on to prove consent.
+
+### Not every campaign multiplies points
+
+`Campaign::$family` says what kind a campaign is. A `purchase` campaign carries a
+multiplier and a schedule; a `customer_moment` one (a birthday gift, say) carries
+neither and sends null for `multiplier`, `recurrenceType` and `recurrenceConfig`.
+Branch on `family` before reading any of the three.
 
 ## Token storage
 
@@ -399,6 +520,7 @@ business leaving balances behind.
 
 ## Links
 
+- Changelog — [`CHANGELOG.md`](CHANGELOG.md)
 - API documentation — <https://docs.puntjes.app>
 - OpenAPI spec — `{your Puntjes host}/docs/api.json`
 
