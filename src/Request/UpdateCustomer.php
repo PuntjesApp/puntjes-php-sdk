@@ -29,6 +29,14 @@ final class UpdateCustomer
         public readonly string|null|Undefined $dateOfBirth = new Undefined,
         /** `nl` or `en`. */
         public readonly string|null|Undefined $locale = new Undefined,
+        /** `Y-m-d`. Null clears the override, putting tenure back on the registration date. */
+        public readonly string|null|Undefined $customerSince = new Undefined,
+        /**
+         * Record an opt-in (true) or a withdrawal (false). The API timestamps the
+         * change and records that it came from the API, so the vendor can show when
+         * and where consent moved.
+         */
+        public readonly bool|null|Undefined $marketingConsent = new Undefined,
     ) {}
 
     /** @return array<string, mixed> */
@@ -41,6 +49,8 @@ final class UpdateCustomer
             'phone' => $this->phone,
             'date_of_birth' => $this->dateOfBirth,
             'locale' => $this->locale,
+            'customer_since' => $this->customerSince,
+            'marketing_consent' => $this->marketingConsent,
         ]);
     }
 }

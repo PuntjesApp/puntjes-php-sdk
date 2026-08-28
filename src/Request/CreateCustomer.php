@@ -19,6 +19,8 @@ final class CreateCustomer
      * @param  array<int, CreateIdentifier>  $identifiers  At least one.
      * @param  string|null  $dateOfBirth  `Y-m-d`.
      * @param  string|null  $locale  `nl` or `en`.
+     * @param  string|null  $customerSince  `Y-m-d`. Overrides the registration date as the tenure start.
+     * @param  bool|null  $marketingConsent  Whether they opted in to marketing email. Omit when you did not ask.
      */
     public function __construct(
         public readonly array $identifiers,
@@ -29,6 +31,13 @@ final class CreateCustomer
         public readonly ?string $externalId = null,
         public readonly ?string $dateOfBirth = null,
         public readonly ?string $locale = null,
+        public readonly ?string $customerSince = null,
+        /**
+         * Only send true when the customer actually opted in on your side — this is
+         * the record the vendor relies on to prove consent. Omitting it registers no
+         * opt-in, which is the safe default.
+         */
+        public readonly ?bool $marketingConsent = null,
     ) {
         if ($identifiers === []) {
             throw new ConfigurationException(
@@ -48,6 +57,8 @@ final class CreateCustomer
             'external_id' => $this->externalId,
             'date_of_birth' => $this->dateOfBirth,
             'locale' => $this->locale,
+            'customer_since' => $this->customerSince,
+            'marketing_consent' => $this->marketingConsent,
         ];
 
         // Null here means "not supplied" — the create endpoint has no partial-update

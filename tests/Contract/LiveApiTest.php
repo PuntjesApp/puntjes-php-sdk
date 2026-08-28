@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace Puntjes\Tests\Contract;
 
 use PHPUnit\Framework\TestCase;
+use Puntjes\Enum\ErrorCode;
 use Puntjes\Enum\Period;
 use Puntjes\Enum\ProductStatus;
+use Puntjes\Exception\ApiException;
 use Puntjes\Exception\ConflictException;
 use Puntjes\Exception\NotFoundException;
+use Puntjes\Model\Branch;
 use Puntjes\Puntjes;
 use Puntjes\Request\CreateProduct;
 use Puntjes\Request\ProductFilters;
@@ -126,6 +129,13 @@ final class LiveApiTest extends TestCase
         foreach ($rewards as $reward) {
             self::assertGreaterThan(0, $reward->pointCost);
             self::assertNotNull($reward->type, 'Unknown reward type on the wire: '.$reward->rawType);
+
+            // Null means redeemable anywhere; a list means limited to those shops. An
+            // empty list is a third thing again and must survive the round trip.
+            foreach ($reward->branches ?? [] as $branch) {
+                self::assertNotSame('', $branch->externalId);
+                self::assertNotNull($branch->type, 'Unknown branch type on the wire: '.$branch->rawType);
+            }
         }
 
         self::assertIsArray($rewards);
@@ -137,6 +147,25 @@ final class LiveApiTest extends TestCase
 
         self::assertGreaterThanOrEqual(1, $page->meta->currentPage);
         self::assertGreaterThanOrEqual(0, $page->meta->total);
+
+        foreach ($page->items as $campaign) {
+            // A customer-moment campaign carries none of the three, which is the shape
+            // that crashed an SDK typing them as always-present.
+            self::assertNotSame('', $campaign->family);
+
+            foreach ($campaign->branches ?? [] as $branch) {
+                self::assertNotSame('', $branch->externalId);
+            }
+        }
+    }
+
+    public function test_campaigns_can_be_filtered_to_the_unassigned_bucket(): void
+    {
+        // `none` is the one branch key valid on every instance, whatever shops the
+        // vendor has, so it is the only filter a contract test can assert on.
+        $page = $this->puntjes()->campaigns->list(branch: Branch::UNASSIGNED)->firstPage();
+
+        self::assertGreaterThanOrEqual(0, $page->meta->total);
     }
 
     public function test_statistics_decode_the_full_envelope(): void
@@ -147,7 +176,60 @@ final class LiveApiTest extends TestCase
         self::assertSame('Europe/Brussels', $stats->period->timezone);
         self::assertNotNull($stats->period->granularity, 'Unknown granularity on the wire.');
         self::assertGreaterThanOrEqual(0, $stats->commerce->orders);
+        // Present exactly because this call names no branch.
+        self::assertNotNull($stats->loyalty);
         self::assertGreaterThanOrEqual(0, $stats->loyalty->pointsIssued);
+    }
+
+    public function test_a_branch_filtered_report_drops_the_loyalty_block(): void
+    {
+        $stats = $this->puntjes()->statistics->get(Period::ThirtyDays, branch: Branch::UNASSIGNED);
+
+        // Not an omission: neither points liability nor breakage can be attributed to
+        // one shop, so the API refuses to print a vendor-wide number under a branch
+        // label. An SDK typing this as always-present crashes here.
+        self::assertNull($stats->loyalty);
+        self::assertGreaterThanOrEqual(0, $stats->commerce->orders);
+    }
+
+    public function test_an_unknown_branch_key_is_refused_rather_than_ignored(): void
+    {
+        try {
+            $this->puntjes()->statistics->get(
+                Period::ThirtyDays,
+                branch: 'sdk-contract-'.bin2hex(random_bytes(4)),
+            );
+            self::fail('A mistyped branch key must be refused, not answered vendor-wide.');
+        } catch (ApiException $e) {
+            self::assertSame(ErrorCode::BranchNotFound, $e->errorCode());
+            self::assertSame(422, $e->status());
+        }
+    }
+
+    public function test_linking_an_unknown_identifier_is_not_found(): void
+    {
+        // Nothing is written: the customer lookup fails before any link is attempted.
+        try {
+            $this->puntjes()->customers->linkExternalId(
+                'sdk-contract-'.bin2hex(random_bytes(4)),
+                'sdk-contract-'.bin2hex(random_bytes(4)),
+            );
+            self::fail('Linking an unknown identifier must not succeed.');
+        } catch (NotFoundException $e) {
+            self::assertSame('CUSTOMER_NOT_FOUND', $e->code());
+        }
+    }
+
+    public function test_sending_a_card_to_an_unknown_external_id_is_not_found(): void
+    {
+        // A random external id cannot collide with a real customer, so no mail can be
+        // queued by this test.
+        try {
+            $this->puntjes()->customers->sendCardByExternalId('sdk-contract-'.bin2hex(random_bytes(4)));
+            self::fail('Sending a card to an unknown external id must not succeed.');
+        } catch (NotFoundException $e) {
+            self::assertNotNull($e->requestId());
+        }
     }
 
     public function test_the_product_lifecycle(): void

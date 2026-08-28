@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Puntjes\Model;
 
 use Puntjes\Enum\CustomerStatus;
+use Puntjes\Resource\Customers;
 use Puntjes\Support\Cast;
 
 /**
@@ -37,6 +38,23 @@ final class Customer
         public readonly ?string $updatedAt,
         public readonly ?int $walletBalance = null,
         public readonly bool $isDeactivated = false,
+        /**
+         * The vendor's own "customer since" override, as `Y-m-d`, or null when none
+         * is set.
+         *
+         * Null is not "unknown": it means count tenure from {@see $createdAt}, which
+         * this same payload carries.
+         */
+        public readonly ?string $customerSince = null,
+        /**
+         * The customer's loyalty-card code — the value to encode in their QR.
+         *
+         * Persist this the moment {@see Customers::register()} returns,
+         * rather than digging it back out of {@see $identifiers}. Null only for customers
+         * migrated from before the loyalty-card table existed, and for anonymized ones.
+         */
+        public readonly ?string $loyaltyCardCode = null,
+        public readonly MarketingConsent $marketingConsent = new MarketingConsent,
     ) {}
 
     /** @param array<array-key, mixed> $data */
@@ -59,6 +77,9 @@ final class Customer
             updatedAt: Cast::nullableString($data, 'updated_at'),
             walletBalance: Cast::nullableInt($data, 'wallet_balance'),
             isDeactivated: Cast::bool($data, 'is_deactivated'),
+            customerSince: Cast::nullableString($data, 'customer_since'),
+            loyaltyCardCode: Cast::nullableString($data, 'loyalty_card_code'),
+            marketingConsent: MarketingConsent::fromCustomer($data),
         );
     }
 
@@ -68,6 +89,12 @@ final class Customer
         $name = trim(($this->firstName ?? '').' '.($this->lastName ?? ''));
 
         return $name === '' ? null : $name;
+    }
+
+    /** Whether this customer may be sent marketing email right now. */
+    public function hasMarketingConsent(): bool
+    {
+        return $this->marketingConsent->granted;
     }
 
     /** The identifier marked primary, if the vendor set one. */

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Puntjes\Resource;
 
+use Puntjes\Exception\ApiException;
 use Puntjes\Exception\ConfigurationException;
 use Puntjes\Exception\ConflictException;
 use Puntjes\Exception\NotFoundException;
+use Puntjes\Model\CardDelivery;
 use Puntjes\Model\Customer;
 use Puntjes\Request\CreateCustomer;
 use Puntjes\Request\UpdateCustomer;
@@ -103,6 +105,80 @@ final class Customers extends Resource
             $this->transport->patch(
                 '/customers/by-external-id/'.$this->segment($externalId),
                 $changes->toArray(),
+            )->dataArray(),
+        );
+    }
+
+    /**
+     * Attach your own external id to a customer who does not have one yet, found by
+     * an identifier they already carry.
+     *
+     * The backfill call. {@see register()} takes an external id and
+     * {@see updateByExternalId()} needs one, so neither reaches a customer who signed
+     * up before your integration existed — this does, keyed on their card code or
+     * email.
+     *
+     * Re-sending the SAME external id succeeds and returns the customer, so retrying
+     * is safe. A DIFFERENT one is refused with 409 `CUSTOMER_ALREADY_LINKED` rather
+     * than overwriting: whatever system owned the old key would otherwise keep sending
+     * updates that silently start 404ing.
+     *
+     * @param  string  $identifier  A card code, QR value or email the customer already has.
+     * @param  string  $externalId  Their id in your system.
+     *
+     * @throws NotFoundException `CUSTOMER_NOT_FOUND` (404) — no customer carries that identifier.
+     * @throws ConflictException `CUSTOMER_ALREADY_LINKED`, or `EXTERNAL_ID_DUPLICATE`
+     *                           when another customer already holds that external id.
+     */
+    public function linkExternalId(string $identifier, string $externalId): Customer
+    {
+        return Customer::fromArray(
+            $this->transport->post('/customers/link-external-id', [
+                'identifier' => $identifier,
+                'external_id' => $externalId,
+            ])->dataArray(),
+        );
+    }
+
+    /**
+     * Email a customer their loyalty card — the API equivalent of the portal's
+     * "Email pass to customer" button. Responds 202.
+     *
+     * NOT retried automatically: the send is queued the moment the API accepts it, so
+     * replaying a call whose response was merely lost mails the customer twice. The API
+     * throttles repeats per customer and answers `CARD_SEND_THROTTLED`; treat that as
+     * "already on its way", not as a failure.
+     *
+     * @param  string|null  $channel  Omit for the default. `email` is the only channel today.
+     *
+     * @throws NotFoundException `CUSTOMER_NOT_FOUND` (404).
+     * @throws ApiException `CUSTOMER_HAS_NO_EMAIL`, `LOYALTY_CARD_NOT_FOUND` or
+     *                      `CARD_SEND_THROTTLED`.
+     */
+    public function sendCard(int $customerId, ?string $channel = null): CardDelivery
+    {
+        return CardDelivery::fromArray(
+            $this->transport->post(
+                '/customers/'.$this->segment($customerId).'/send-card',
+                $channel === null ? [] : ['channel' => $channel],
+            )->dataArray(),
+        );
+    }
+
+    /**
+     * As {@see sendCard()}, keyed on your own customer id rather than the Puntjes one.
+     *
+     * The form to prefer: the by-external-id routes exist precisely so an integration
+     * never has to store a Puntjes primary key.
+     *
+     * @throws NotFoundException `EXTERNAL_ID_NOT_FOUND` (404).
+     */
+    public function sendCardByExternalId(string $externalId, ?string $channel = null): CardDelivery
+    {
+        return CardDelivery::fromArray(
+            $this->transport->post(
+                '/customers/by-external-id/'.$this->segment($externalId).'/send-card',
+                $channel === null ? [] : ['channel' => $channel],
             )->dataArray(),
         );
     }

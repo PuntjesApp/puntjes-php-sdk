@@ -50,6 +50,12 @@ enum ErrorCode: string
     case IdentifierDuplicate = 'IDENTIFIER_DUPLICATE';
     case ExternalIdDuplicate = 'EXTERNAL_ID_DUPLICATE';
     case ExternalIdNotFound = 'EXTERNAL_ID_NOT_FOUND';
+    case CustomerAlreadyLinked = 'CUSTOMER_ALREADY_LINKED';
+
+    // Loyalty card delivery
+    case CustomerHasNoEmail = 'CUSTOMER_HAS_NO_EMAIL';
+    case LoyaltyCardNotFound = 'LOYALTY_CARD_NOT_FOUND';
+    case CardSendThrottled = 'CARD_SEND_THROTTLED';
 
     // Wallet
     case NoWallet = 'NO_WALLET';

@@ -12,6 +12,8 @@ use Puntjes\Enum\ProductStatus;
 use Puntjes\Enum\RedemptionStatus;
 use Puntjes\Enum\RewardType;
 use Puntjes\Exception\ConfigurationException;
+use Puntjes\Exception\ConflictException;
+use Puntjes\Exception\ServerException;
 use Puntjes\Exception\TransportException;
 use Puntjes\Request\AdjustWallet;
 use Puntjes\Request\CreateCustomer;
@@ -604,5 +606,131 @@ final class ResourceTest extends TestCase
         self::assertSame(['anything' => true], $response->dataArray());
         self::assertSame('Bearer test-token', $this->fake->requestAt(1)->getHeaderLine('Authorization'));
         self::assertStringContainsString('q=1', $this->fake->uriAt(1));
+    }
+
+    public function test_a_customer_carries_their_card_code_and_consent_provenance(): void
+    {
+        $this->fake->queueData($this->customerFixture() + [
+            'customer_since' => '2024-03-01',
+            'loyalty_card_code' => 'PNTJ-CARD-42',
+            'marketingConsent' => true,
+            'marketingConsentGrantedAt' => '2026-03-03T09:00:00+00:00',
+            'marketingConsentGrantedSource' => 'webshop',
+            'marketingConsentWithdrawnAt' => null,
+            'marketingConsentWithdrawnSource' => null,
+        ]);
+
+        $customer = $this->puntjes()->customers->find(42);
+
+        self::assertSame('2024-03-01', $customer->customerSince);
+        // Persist this as the QR value rather than digging through identifiers.
+        self::assertSame('PNTJ-CARD-42', $customer->loyaltyCardCode);
+        self::assertTrue($customer->hasMarketingConsent());
+        self::assertSame('webshop', $customer->marketingConsent->grantedSource);
+        self::assertNull($customer->marketingConsent->withdrawnAt);
+    }
+
+    public function test_a_customer_payload_without_consent_keys_reads_as_no_consent(): void
+    {
+        // An older API than this SDK, or a fixture written before the keys existed.
+        $this->fake->queueData($this->customerFixture());
+
+        $customer = $this->puntjes()->customers->find(42);
+
+        self::assertFalse($customer->hasMarketingConsent());
+        self::assertNull($customer->customerSince);
+        self::assertNull($customer->loyaltyCardCode);
+    }
+
+    public function test_registering_a_customer_can_record_an_opt_in(): void
+    {
+        $this->fake->queueData($this->customerFixture(), 201);
+
+        $this->puntjes()->customers->register(new CreateCustomer(
+            identifiers: [new CreateIdentifier(IdentifierType::Card, 'CARD-1')],
+            customerSince: '2024-03-01',
+            marketingConsent: true,
+        ));
+
+        $body = $this->fake->bodyAt(1);
+        self::assertTrue($body['marketing_consent']);
+        self::assertSame('2024-03-01', $body['customer_since']);
+    }
+
+    public function test_a_withdrawal_is_sent_as_false_rather_than_omitted(): void
+    {
+        // false and "not supplied" are different instructions here: one withdraws
+        // consent, the other leaves it exactly as it was.
+        $this->fake->queueData($this->customerFixture());
+
+        $this->puntjes()->customers->updateByExternalId('PNU-1', new UpdateCustomer(
+            marketingConsent: false,
+        ));
+
+        $body = $this->fake->bodyAt(1);
+        self::assertFalse($body['marketing_consent']);
+        self::assertArrayNotHasKey('email', $body);
+        self::assertArrayNotHasKey('customer_since', $body);
+    }
+
+    public function test_linking_an_external_id_to_a_legacy_customer(): void
+    {
+        $this->fake->queueData(['external_id' => 'PNU-9'] + $this->customerFixture());
+
+        $customer = $this->puntjes()->customers->linkExternalId('CARD-1', 'PNU-9');
+
+        self::assertSame('PNU-9', $customer->externalId);
+        self::assertSame('/api/v1/customers/link-external-id', $this->fake->requestAt(1)->getUri()->getPath());
+        self::assertSame(['identifier' => 'CARD-1', 'external_id' => 'PNU-9'], $this->fake->bodyAt(1));
+    }
+
+    public function test_relinking_to_a_different_external_id_is_a_conflict(): void
+    {
+        $this->fake->queueError(409, 'CUSTOMER_ALREADY_LINKED', 'This customer is already linked to external id PNU-1.');
+
+        $this->expectException(ConflictException::class);
+
+        $this->puntjes()->customers->linkExternalId('CARD-1', 'PNU-9');
+    }
+
+    public function test_emailing_a_customer_their_loyalty_card(): void
+    {
+        $this->fake->queueData(['customer_id' => 42, 'channel' => 'email', 'queued' => true], 202);
+
+        $delivery = $this->puntjes()->customers->sendCard(42);
+
+        self::assertTrue($delivery->queued);
+        self::assertSame('email', $delivery->channel);
+        self::assertSame('/api/v1/customers/42/send-card', $this->fake->requestAt(1)->getUri()->getPath());
+        // No channel named: the API picks its default rather than being told one.
+        self::assertSame([], $this->fake->bodyAt(1));
+    }
+
+    public function test_the_card_can_be_sent_by_your_own_customer_id(): void
+    {
+        $this->fake->queueData(['customer_id' => 42, 'channel' => 'email', 'queued' => true], 202);
+
+        $this->puntjes()->customers->sendCardByExternalId('PNU-1', channel: 'email');
+
+        self::assertSame(
+            '/api/v1/customers/by-external-id/PNU-1/send-card',
+            $this->fake->requestAt(1)->getUri()->getPath(),
+        );
+        self::assertSame(['channel' => 'email'], $this->fake->bodyAt(1));
+    }
+
+    public function test_a_card_send_is_never_retried(): void
+    {
+        // A replay mails the customer a second time, so a lost response must not be
+        // resolved by sending again.
+        $this->fake->queueRaw(503, 'upstream unavailable', ['Content-Type' => 'text/html']);
+
+        try {
+            $this->puntjes()->customers->sendCard(42);
+        } catch (ServerException) {
+            // expected
+        }
+
+        self::assertSame(1, $this->fake->apiRequestCount());
     }
 }
