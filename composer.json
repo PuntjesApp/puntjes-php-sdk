@@ -3,10 +3,10 @@
     "description": "Framework-agnostic PHP client for the Puntjes loyalty API.",
     "type": "library",
     "keywords": ["puntjes", "loyalty", "sdk", "api", "psr-18"],
-    "homepage": "https://github.com/TheGangOfFour/puntjes-php-sdk",
+    "homepage": "https://github.com/PuntjesApp/puntjes-php-sdk",
     "license": "MIT",
     "support": {
-        "issues": "https://github.com/TheGangOfFour/puntjes-php-sdk/issues",
+        "issues": "https://github.com/PuntjesApp/puntjes-php-sdk/issues",
         "docs": "https://docs.puntjes.app"
     },
     "require": {

@@ -5,7 +5,7 @@ Framework-agnostic PHP client for the [Puntjes](https://puntjes.app) loyalty API
 Works anywhere PHP 8.1 runs — a Laravel webshop, a WooCommerce plugin, a POS bridge,
 a cron script. No HTTP client is forced on you.
 
-- **Laravel** → install [`puntjes/laravel`](https://github.com/TheGangOfFour/puntjes-laravel) on top for config, a facade and cache-backed tokens.
+- **Laravel** → install [`puntjes/laravel`](https://github.com/PuntjesApp/puntjes-laravel) on top for config, a facade and cache-backed tokens.
 - **WordPress / WooCommerce** → use this package directly, plus the [notes below](#wordpress--woocommerce).
 
 ## Install
