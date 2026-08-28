@@ -7,23 +7,32 @@ namespace Puntjes\Model;
 use Puntjes\Support\Cast;
 
 /**
- * A points multiplier active over a schedule (double points on Fridays, and such).
+ * A campaign the vendor is running, from `GET /campaigns` — active ones only, both
+ * currently running and scheduled to start.
  *
- * `GET /campaigns` lists active campaigns only, both currently running and
- * scheduled to start.
+ * ## Not every campaign multiplies points
+ *
+ * {@see $family} says what kind this is. A purchase campaign carries a
+ * {@see $multiplier} and a schedule; a customer-moment campaign (a birthday gift, say)
+ * carries neither, and sends null for {@see $multiplier}, {@see $recurrenceType} and
+ * {@see $recurrenceConfig}. Branch on `family` before reading any of the three.
+ *
+ * Campaigns are applied server-side when a transaction is recorded. Nothing here has
+ * to be passed back in — this endpoint is for showing "double points this Friday" at
+ * the till.
  */
 final class Campaign
 {
     /**
-     * @param  array<string, mixed>  $recurrenceConfig  Shape depends on $recurrenceType.
+     * @param  array<string, mixed>|null  $recurrenceConfig  Shape depends on $recurrenceType. Null when the campaign has no schedule.
      */
     public function __construct(
         public readonly int $id,
         public readonly string $name,
-        /** Points multiplier applied to qualifying transactions. */
-        public readonly int $multiplier,
-        public readonly string $recurrenceType,
-        public readonly array $recurrenceConfig,
+        /** Null for a campaign family that has no multiplier, such as a customer moment. */
+        public readonly ?int $multiplier,
+        public readonly ?string $recurrenceType,
+        public readonly ?array $recurrenceConfig,
         /** Human-readable schedule, already localised by the API. */
         public readonly string $scheduleSummary,
         public readonly string $startsAt,
@@ -37,19 +46,23 @@ final class Campaign
         public readonly ?float $minTransactionAmount,
         public readonly ?string $createdAt,
         public readonly ?string $updatedAt,
+        /** Which kind of campaign this is — read it before trusting {@see $multiplier}. */
+        public readonly string $family = '',
+        /** For a customer-moment family, which moment triggers it. Null otherwise. */
+        public readonly ?string $moment = null,
     ) {}
 
     /** @param array<array-key, mixed> $data */
     public static function fromArray(array $data): self
     {
-        /** @var array<string, mixed> $recurrenceConfig */
-        $recurrenceConfig = Cast::array($data, 'recurrence_config');
+        /** @var array<string, mixed>|null $recurrenceConfig */
+        $recurrenceConfig = Cast::nullableArray($data, 'recurrence_config');
 
         return new self(
             id: Cast::int($data, 'id'),
             name: Cast::string($data, 'name'),
-            multiplier: Cast::int($data, 'multiplier'),
-            recurrenceType: Cast::string($data, 'recurrence_type'),
+            multiplier: Cast::nullableInt($data, 'multiplier'),
+            recurrenceType: Cast::nullableString($data, 'recurrence_type'),
             recurrenceConfig: $recurrenceConfig,
             scheduleSummary: Cast::string($data, 'schedule_summary'),
             startsAt: Cast::string($data, 'starts_at'),
@@ -58,6 +71,8 @@ final class Campaign
             minTransactionAmount: Cast::nullableFloat($data, 'min_transaction_amount'),
             createdAt: Cast::nullableString($data, 'created_at'),
             updatedAt: Cast::nullableString($data, 'updated_at'),
+            family: Cast::string($data, 'family'),
+            moment: Cast::nullableString($data, 'moment'),
         );
     }
 }

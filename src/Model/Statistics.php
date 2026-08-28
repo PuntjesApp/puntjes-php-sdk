@@ -14,13 +14,24 @@ use Puntjes\Support\Cast;
  *
  * The two blocks answer different questions and are deliberately not merged —
  * `commerce` comes from recorded transactions, `loyalty` from the points ledger.
+ *
+ * Under a `branch:` filter {@see $loyalty} is null and `commerce` covers that shop
+ * alone. Check for null before reading it.
  */
 final class Statistics
 {
     public function __construct(
         public readonly StatisticsPeriod $period,
         public readonly CommerceStatistics $commerce,
-        public readonly LoyaltyStatistics $loyalty,
+        /**
+         * Null when the request narrowed to a single branch.
+         *
+         * Not an omission: points liability is a wallet snapshot and breakage is a ratio
+         * whose two halves come from different populations, so neither can be narrowed to
+         * one shop. Returning the vendor-wide figures beside branch-filtered commerce
+         * numbers would be the misreading this null exists to prevent.
+         */
+        public readonly ?LoyaltyStatistics $loyalty,
     ) {}
 
     /** @param array<array-key, mixed> $data */
@@ -29,7 +40,7 @@ final class Statistics
         return new self(
             period: StatisticsPeriod::fromArray(Cast::array($data, 'period')),
             commerce: CommerceStatistics::fromArray(Cast::array($data, 'commerce')),
-            loyalty: LoyaltyStatistics::fromArray(Cast::array($data, 'loyalty')),
+            loyalty: Cast::object($data, 'loyalty', LoyaltyStatistics::fromArray(...)),
         );
     }
 }
