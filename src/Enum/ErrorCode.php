@@ -72,6 +72,11 @@ enum ErrorCode: string
     case VerificationFailed = 'VERIFICATION_FAILED';
     case IdempotencyKeyConflict = 'IDEMPOTENCY_KEY_CONFLICT';
 
+    // Campaign vouchers
+    case VoucherNotFound = 'VOUCHER_NOT_FOUND';
+    case VoucherExpired = 'VOUCHER_EXPIRED';
+    case VoucherAlreadyUsed = 'VOUCHER_ALREADY_USED';
+
     // Products
     case ProductNotFound = 'PRODUCT_NOT_FOUND';
     case ProductExternalIdDuplicate = 'PRODUCT_EXTERNAL_ID_DUPLICATE';

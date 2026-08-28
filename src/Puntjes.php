@@ -23,6 +23,7 @@ use Puntjes\Resource\Redemptions;
 use Puntjes\Resource\Rewards;
 use Puntjes\Resource\Statistics;
 use Puntjes\Resource\Transactions;
+use Puntjes\Resource\Vouchers;
 use Puntjes\Resource\Wallets;
 
 /**
@@ -68,6 +69,8 @@ final class Puntjes
 
     public readonly Statistics $statistics;
 
+    public readonly Vouchers $vouchers;
+
     public function __construct(
         private readonly Config $config,
         private readonly Transport $transport,
@@ -81,6 +84,7 @@ final class Puntjes
         $this->products = new Products($transport);
         $this->campaigns = new Campaigns($transport);
         $this->statistics = new Statistics($transport);
+        $this->vouchers = new Vouchers($transport);
     }
 
     /**

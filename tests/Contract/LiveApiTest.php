@@ -206,6 +206,18 @@ final class LiveApiTest extends TestCase
         }
     }
 
+    public function test_an_unissued_voucher_code_is_not_found(): void
+    {
+        // Verifying is a consume, so the only code a contract test may send is one that
+        // cannot exist. This still pins the route, the error code and the status.
+        try {
+            $this->puntjes()->vouchers->verify('SDKCONTRACT'.bin2hex(random_bytes(4)));
+            self::fail('An unissued voucher code must not verify.');
+        } catch (NotFoundException $e) {
+            self::assertSame('VOUCHER_NOT_FOUND', $e->code());
+        }
+    }
+
     public function test_linking_an_unknown_identifier_is_not_found(): void
     {
         // Nothing is written: the customer lookup fails before any link is attempted.

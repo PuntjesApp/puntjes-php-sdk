@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Puntjes\Tests\Unit;
 
 use Puntjes\Enum\CustomerStatus;
+use Puntjes\Enum\ErrorCode;
 use Puntjes\Enum\IdentifierType;
 use Puntjes\Enum\LedgerEntryType;
 use Puntjes\Enum\Period;
 use Puntjes\Enum\ProductStatus;
 use Puntjes\Enum\RedemptionStatus;
 use Puntjes\Enum\RewardType;
+use Puntjes\Exception\ApiException;
 use Puntjes\Exception\ConfigurationException;
 use Puntjes\Exception\ConflictException;
 use Puntjes\Exception\ServerException;
@@ -729,6 +731,89 @@ final class ResourceTest extends TestCase
             $this->puntjes()->customers->sendCard(42);
         } catch (ServerException) {
             // expected
+        }
+
+        self::assertSame(1, $this->fake->apiRequestCount());
+    }
+
+    public function test_spending_a_discount_voucher(): void
+    {
+        $this->fake->queueData([
+            'voucher_code' => 'BON-ABC12345',
+            'discount' => ['kind' => 'fixed', 'amount_cents' => 750],
+            'valid_until' => '2026-12-31',
+            'consumed_at' => '2026-08-28T10:00:00+00:00',
+            'campaign_id' => 4,
+            'kind' => 'discount',
+            'products' => null,
+        ]);
+
+        $result = $this->puntjes()->vouchers->verify('BON-ABC12345', branch: 'centrum');
+
+        self::assertFalse($result->isFreeProduct());
+        self::assertSame(750, $result->discount?->amountCents);
+        self::assertSame(750, $result->discount?->appliedTo(4200));
+        self::assertNull($result->products);
+        self::assertSame(['branch' => 'centrum'], $this->fake->bodyAt(1));
+        self::assertSame('/api/v1/vouchers/BON-ABC12345/verify', $this->fake->requestAt(1)->getUri()->getPath());
+    }
+
+    public function test_a_percentage_voucher_is_applied_to_the_order_total(): void
+    {
+        $this->fake->queueData([
+            'voucher_code' => 'BON-PCT',
+            'discount' => ['kind' => 'percentage', 'percentage' => 10],
+            'valid_until' => null,
+            'consumed_at' => '2026-08-28T10:00:00+00:00',
+            'campaign_id' => 4,
+            'kind' => 'discount',
+            'products' => null,
+        ]);
+
+        $result = $this->puntjes()->vouchers->verify('BON-PCT');
+
+        self::assertTrue($result->discount?->isPercentage());
+        self::assertSame(420, $result->discount?->appliedTo(4200));
+    }
+
+    public function test_spending_a_free_product_voucher_lists_what_to_hand_over(): void
+    {
+        $this->fake->queueData([
+            'voucher_code' => 'BON-GIFT',
+            'discount' => null,
+            'valid_until' => null,
+            'consumed_at' => '2026-08-28T10:00:00+00:00',
+            'campaign_id' => 7,
+            'kind' => 'free_product',
+            'products' => [
+                ['id' => 3, 'name' => 'Brood', 'quantity' => 1],
+                ['id' => null, 'name' => 'Koffie (verwijderd)', 'quantity' => 2],
+            ],
+        ]);
+
+        $result = $this->puntjes()->vouchers->verify('BON-GIFT');
+
+        self::assertTrue($result->isFreeProduct());
+        self::assertNull($result->discount);
+
+        $products = $result->products;
+        self::assertNotNull($products);
+        self::assertCount(2, $products);
+        self::assertSame('Brood', $products[0]->name);
+        self::assertSame(2, $products[1]->quantity);
+        // The bon keeps its mint-time snapshot even after the product is deleted.
+        self::assertNull($products[1]->id);
+    }
+
+    public function test_a_spent_voucher_is_refused_and_never_replayed(): void
+    {
+        $this->fake->queueError(422, 'VOUCHER_ALREADY_USED', 'This voucher has already been used.');
+
+        try {
+            $this->puntjes()->vouchers->verify('BON-ABC12345');
+            self::fail('Expected the spent bon to be refused.');
+        } catch (ApiException $e) {
+            self::assertSame(ErrorCode::VoucherAlreadyUsed, $e->errorCode());
         }
 
         self::assertSame(1, $this->fake->apiRequestCount());
