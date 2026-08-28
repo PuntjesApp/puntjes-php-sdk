@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Puntjes\Request;
 
+use Puntjes\Model\Branch;
 use Puntjes\Support\Uuid;
 
 /**
@@ -21,11 +22,21 @@ final class CreateRedemption
     /**
      * @param  string  $identifier  The customer's scanned loyalty identifier.
      * @param  int  $rewardId  Puntjes reward id, from the reward catalogue.
+     * @param  string|null  $branch  The vendor's key for the shop handing the reward over.
      */
     public function __construct(
         public readonly string $identifier,
         public readonly int $rewardId,
         ?string $idempotencyKey = null,
+        /**
+         * Where the reward is being handed over, by the vendor's own branch key.
+         *
+         * Omit it and the API falls back to the credential's default branch, then to
+         * none. A reward limited to particular branches refuses anywhere else with
+         * `BRANCH_REQUIRED` (422); an unknown key is `BRANCH_NOT_FOUND`.
+         * {@see Branch::UNASSIGNED} is a filter word and is not valid here.
+         */
+        public readonly ?string $branch = null,
     ) {
         $this->idempotencyKey = $idempotencyKey ?? Uuid::v4();
     }
@@ -33,10 +44,16 @@ final class CreateRedemption
     /** @return array<string, mixed> */
     public function toArray(): array
     {
-        return [
+        $payload = [
             'identifier' => $this->identifier,
             'reward_id' => $this->rewardId,
             'idempotency_key' => $this->idempotencyKey,
         ];
+
+        if ($this->branch !== null) {
+            $payload['branch'] = $this->branch;
+        }
+
+        return $payload;
     }
 }

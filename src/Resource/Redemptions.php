@@ -29,6 +29,9 @@ final class Redemptions extends Resource
      * @throws ApiException `INSUFFICIENT_BALANCE`, `OUT_OF_STOCK`,
      *                      `REWARD_UNAVAILABLE`, `NO_WALLET` or
      *                      `CUSTOMER_DEACTIVATED` — all 422.
+     * @throws ApiException `BRANCH_REQUIRED` (422) when the reward is limited to
+     *                      branches and this is not one of them, or `BRANCH_NOT_FOUND`
+     *                      when the key names no branch of this vendor.
      * @throws NotFoundException `CUSTOMER_NOT_FOUND` or `REWARD_NOT_FOUND`.
      */
     public function create(CreateRedemption $redemption): Redemption

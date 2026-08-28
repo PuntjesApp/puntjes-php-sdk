@@ -37,6 +37,13 @@ enum ErrorCode: string
     // Plan / quota
     case PlanLimitExceeded = 'PLAN_LIMIT_EXCEEDED';
 
+    // Branches — all 422. NotFound and Inactive are deliberately distinct: one means
+    // you typed a key the vendor has never had, the other that they closed that shop.
+    case BranchNotFound = 'BRANCH_NOT_FOUND';
+    case BranchInactive = 'BRANCH_INACTIVE';
+    /** The reward or voucher is limited to branches, and this is not one of them. */
+    case BranchRequired = 'BRANCH_REQUIRED';
+
     // Customers
     case CustomerNotFound = 'CUSTOMER_NOT_FOUND';
     case CustomerDeactivated = 'CUSTOMER_DEACTIVATED';

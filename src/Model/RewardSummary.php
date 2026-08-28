@@ -29,6 +29,15 @@ final class RewardSummary
         public readonly ?string $availableFrom,
         public readonly ?string $availableUntil,
         public readonly string $rawType,
+        /**
+         * The shops this reward may be redeemed at. Null means anywhere.
+         *
+         * Redeeming at a branch outside the scope is refused with `BRANCH_REQUIRED`,
+         * so a till can grey the reward out rather than letting the customer pick it.
+         *
+         * @var array<int, Branch>|null
+         */
+        public readonly ?array $branches = null,
     ) {}
 
     /** @param array<array-key, mixed> $data */
@@ -48,7 +57,14 @@ final class RewardSummary
             availableFrom: Cast::nullableString($data, 'available_from'),
             availableUntil: Cast::nullableString($data, 'available_until'),
             rawType: $rawType,
+            branches: Branch::scopeFromArray($data),
         );
+    }
+
+    /** Whether this reward is redeemable at every branch, rather than a named few. */
+    public function isRedeemableEverywhere(): bool
+    {
+        return $this->branches === null;
     }
 
     /** Whether a customer holding this balance can afford the reward right now. */

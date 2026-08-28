@@ -24,7 +24,9 @@ use Puntjes\Support\Cast;
 final class Campaign
 {
     /**
+     * @param  array<string, mixed>|null  $config  Verbatim campaign configuration; shape depends on $family.
      * @param  array<string, mixed>|null  $recurrenceConfig  Shape depends on $recurrenceType. Null when the campaign has no schedule.
+     * @param  array<int, Branch>|null  $branches  The shops this campaign runs at. Null means all of them — see {@see Branch::scopeFromArray()}.
      */
     public function __construct(
         public readonly int $id,
@@ -50,6 +52,10 @@ final class Campaign
         public readonly string $family = '',
         /** For a customer-moment family, which moment triggers it. Null otherwise. */
         public readonly ?string $moment = null,
+        public readonly ?array $config = null,
+        /** Bumped when the vendor edits the campaign; a voucher records the version it was minted under. */
+        public readonly int $version = 0,
+        public readonly ?array $branches = null,
     ) {}
 
     /** @param array<array-key, mixed> $data */
@@ -57,6 +63,8 @@ final class Campaign
     {
         /** @var array<string, mixed>|null $recurrenceConfig */
         $recurrenceConfig = Cast::nullableArray($data, 'recurrence_config');
+        /** @var array<string, mixed>|null $config */
+        $config = Cast::nullableArray($data, 'config');
 
         return new self(
             id: Cast::int($data, 'id'),
@@ -73,6 +81,15 @@ final class Campaign
             updatedAt: Cast::nullableString($data, 'updated_at'),
             family: Cast::string($data, 'family'),
             moment: Cast::nullableString($data, 'moment'),
+            config: $config,
+            version: Cast::int($data, 'version'),
+            branches: Branch::scopeFromArray($data),
         );
+    }
+
+    /** Whether this campaign runs at every branch, rather than a named few. */
+    public function runsEverywhere(): bool
+    {
+        return $this->branches === null;
     }
 }

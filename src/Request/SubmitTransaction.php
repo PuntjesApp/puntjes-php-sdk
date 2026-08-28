@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Puntjes\Request;
 
+use Puntjes\Model\Branch;
 use Puntjes\Support\Uuid;
 
 /**
@@ -34,6 +35,7 @@ final class SubmitTransaction
      * @param  int  $totalAmount  Order total in cents. Must be at least 1.
      * @param  array<int, LineItem>  $items  Up to 200 lines.
      * @param  string|null  $externalReference  Your order/receipt number, for reconciliation.
+     * @param  string|null  $branch  The vendor's key for the shop this purchase happened at.
      */
     public function __construct(
         public readonly string $identifier,
@@ -42,6 +44,19 @@ final class SubmitTransaction
         public readonly ?string $description = null,
         public readonly ?string $externalReference = null,
         public readonly array $items = [],
+        /**
+         * Which shop rang this up, by the vendor's own branch key.
+         *
+         * Omit it and the API falls back to the branch your API credential defaults to,
+         * and then to no branch at all — the Unassigned bucket. So a till that only ever
+         * serves one shop is better configured once in the portal than made to send this
+         * on every call.
+         *
+         * An unknown key is refused with `BRANCH_NOT_FOUND` and a closed shop with
+         * `BRANCH_INACTIVE`, both 422 — the transaction is not recorded either way.
+         * {@see Branch::UNASSIGNED} is a filter word and is not valid here.
+         */
+        public readonly ?string $branch = null,
     ) {
         $this->idempotencyKey = $idempotencyKey ?? Uuid::v4();
     }
@@ -61,6 +76,10 @@ final class SubmitTransaction
 
         if ($this->externalReference !== null) {
             $payload['external_reference'] = $this->externalReference;
+        }
+
+        if ($this->branch !== null) {
+            $payload['branch'] = $this->branch;
         }
 
         if ($this->items !== []) {

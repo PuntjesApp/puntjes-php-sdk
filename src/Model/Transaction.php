@@ -32,6 +32,12 @@ final class Transaction
         public readonly int $pointsEarned,
         public readonly array $rulesApplied,
         public readonly array $items,
+        /**
+         * The shop this purchase was recorded at, or null for the Unassigned bucket —
+         * no branch was named on the request and the credential that sent it defaults
+         * to none.
+         */
+        public readonly ?Branch $branch = null,
     ) {}
 
     /** @param array<array-key, mixed> $data */
@@ -48,6 +54,7 @@ final class Transaction
             pointsEarned: Cast::int($data, 'points_earned'),
             rulesApplied: array_values(Cast::array($data, 'rules_applied')),
             items: Cast::list($data, 'items', TransactionItem::fromArray(...)),
+            branch: Cast::object($data, 'branch', Branch::fromArray(...)),
         );
     }
 }

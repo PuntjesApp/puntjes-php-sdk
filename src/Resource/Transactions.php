@@ -24,8 +24,14 @@ final class Transactions extends Resource
      * response reports `pointsEarned: 0` — the points from the first call still
      * stand. Read the wallet if you need the balance.
      *
+     * Which shop it happened at comes from `SubmitTransaction(branch: …)`, falling back
+     * to the branch the API credential defaults to, and then to none at all.
+     *
      * @throws NotFoundException (`CUSTOMER_NOT_FOUND`) for an unknown identifier.
      * @throws ApiException (`CUSTOMER_DEACTIVATED`, 422) when the customer cannot transact.
+     * @throws ApiException (`BRANCH_NOT_FOUND` or `BRANCH_INACTIVE`, 422) when the branch
+     *                      key names nothing, or names a shop the vendor has closed.
+     *                      Nothing is recorded either way.
      * @throws PlanLimitExceededException when the vendor's plan transaction cap is spent.
      */
     public function submit(SubmitTransaction $transaction): Transaction

@@ -121,6 +121,36 @@ final class Cast
     }
 
     /**
+     * As {@see list()}, but preserving the difference between an absent list and an
+     * empty one. Several fields on this API mean opposite things by the two — a
+     * `branches` scope of null runs everywhere, an empty one matches nothing.
+     *
+     * @template T
+     *
+     * @param  array<array-key, mixed>  $data
+     * @param  callable(array<array-key, mixed>): T  $factory
+     * @return array<int, T>|null
+     */
+    public static function nullableList(array $data, string $key, callable $factory): ?array
+    {
+        $rows = self::nullableArray($data, $key);
+
+        if ($rows === null) {
+            return null;
+        }
+
+        $items = [];
+
+        foreach ($rows as $row) {
+            if (is_array($row)) {
+                $items[] = $factory($row);
+            }
+        }
+
+        return $items;
+    }
+
+    /**
      * Nested object, or null when absent.
      *
      * @template T
