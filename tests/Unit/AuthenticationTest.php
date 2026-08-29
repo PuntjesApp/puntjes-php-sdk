@@ -211,7 +211,7 @@ final class AuthenticationTest extends TestCase
         $this->fake->queueData(['id' => 7], 201);
 
         $customer = $this->puntjes()->customers->register(new CreateCustomer(
-            identifiers: [CreateIdentifier::card('CARD-NEW')],
+            identifiers: [CreateIdentifier::loyaltyCard('B3H9RT5W')],
         ));
 
         self::assertSame(7, $customer->id);

@@ -123,7 +123,7 @@ final class Customers extends Resource
      * than overwriting: whatever system owned the old key would otherwise keep sending
      * updates that silently start 404ing.
      *
-     * @param  string  $identifier  A card code, QR value or email the customer already has.
+     * @param  string  $identifier  A loyalty card code or email the customer already has.
      * @param  string  $externalId  Their id in your system.
      *
      * @throws NotFoundException `CUSTOMER_NOT_FOUND` (404) — no customer carries that identifier.

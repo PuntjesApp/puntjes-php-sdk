@@ -4,26 +4,25 @@ declare(strict_types=1);
 
 namespace Puntjes\Request;
 
-use Puntjes\Exception\ConfigurationException;
-
 /**
  * Registration payload for `POST /customers`.
  *
- * At least one identifier is required — a customer with no way to be recognised at
- * the till cannot earn anything. Set `externalId` to the customer's id in your own
- * system to make the push-sync endpoints usable later.
+ * Send no identifiers and Puntjes issues the loyalty card itself, which is the common
+ * case. Pass one only when the customer already carries something you want to keep, such
+ * as a card code printed before they signed up. Set `externalId` to the customer's id in
+ * your own system to make the push-sync endpoints usable later.
  */
 final class CreateCustomer
 {
     /**
-     * @param  array<int, CreateIdentifier>  $identifiers  At least one.
+     * @param  array<int, CreateIdentifier>  $identifiers  Empty lets Puntjes issue the card.
      * @param  string|null  $dateOfBirth  `Y-m-d`.
      * @param  string|null  $locale  `nl` or `en`.
      * @param  string|null  $customerSince  `Y-m-d`. Overrides the registration date as the tenure start.
      * @param  bool|null  $marketingConsent  Whether they opted in to marketing email. Omit when you did not ask.
      */
     public function __construct(
-        public readonly array $identifiers,
+        public readonly array $identifiers = [],
         public readonly ?string $firstName = null,
         public readonly ?string $lastName = null,
         public readonly ?string $email = null,
@@ -38,13 +37,7 @@ final class CreateCustomer
          * opt-in, which is the safe default.
          */
         public readonly ?bool $marketingConsent = null,
-    ) {
-        if ($identifiers === []) {
-            throw new ConfigurationException(
-                'A customer needs at least one identifier — a card, QR code, email or phone number.',
-            );
-        }
-    }
+    ) {}
 
     /** @return array<string, mixed> */
     public function toArray(): array

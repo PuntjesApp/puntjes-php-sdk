@@ -52,7 +52,7 @@ final class ResourceTest extends TestCase
             'status' => ['value' => 'active', 'label' => 'Active'],
             'identifiers' => [[
                 'id' => 7,
-                'type' => 'card',
+                'type' => 'loyalty_card',
                 'value' => 'CARD-1',
                 'is_active' => true,
                 'is_primary' => true,
@@ -76,7 +76,7 @@ final class ResourceTest extends TestCase
         self::assertSame(CustomerStatus::Active, $customer->status);
         self::assertSame(320, $customer->walletBalance);
         self::assertFalse($customer->isDeactivated);
-        self::assertSame(IdentifierType::Card, $customer->primaryIdentifier()?->type);
+        self::assertSame(IdentifierType::LoyaltyCard, $customer->primaryIdentifier()?->type);
         self::assertStringContainsString('identifier=CARD-1', $this->fake->uriAt(1));
     }
 
@@ -124,7 +124,7 @@ final class ResourceTest extends TestCase
         $this->fake->queueData($this->customerFixture(), 201);
 
         $this->puntjes()->customers->register(new CreateCustomer(
-            identifiers: [CreateIdentifier::card('CARD-1'), CreateIdentifier::email('jan@example.com')],
+            identifiers: [CreateIdentifier::loyaltyCard('7KQ4M2XP'), CreateIdentifier::email('jan@example.com')],
             firstName: 'Jan',
             externalId: 'PNU-1',
         ));
@@ -133,16 +133,38 @@ final class ResourceTest extends TestCase
         self::assertSame('Jan', $body['first_name']);
         self::assertSame('PNU-1', $body['external_id']);
         self::assertCount(2, $body['identifiers']);
-        self::assertSame(['type' => 'card', 'value' => 'CARD-1', 'is_primary' => true], $body['identifiers'][0]);
+        self::assertSame(['type' => 'loyalty_card', 'value' => '7KQ4M2XP', 'is_primary' => true], $body['identifiers'][0]);
         // Unset optionals are omitted rather than sent as null.
         self::assertArrayNotHasKey('phone', $body);
     }
 
-    public function test_registering_without_an_identifier_fails_before_a_request_is_made(): void
+    /**
+     * The common case: send no identifiers and the API mints the loyalty card itself. The
+     * SDK used to refuse this before a request was ever made.
+     */
+    public function test_registering_without_identifiers_lets_puntjes_issue_the_card(): void
     {
-        $this->expectException(ConfigurationException::class);
+        $this->fake->queueData($this->customerFixture(), 201);
 
-        new CreateCustomer(identifiers: []);
+        $this->puntjes()->customers->register(new CreateCustomer(firstName: 'Jan'));
+
+        $body = $this->fake->bodyAt(1);
+        self::assertSame([], $body['identifiers']);
+        self::assertSame('Jan', $body['first_name']);
+    }
+
+    public function test_a_loyalty_card_identifier_is_sent_with_the_accepted_type(): void
+    {
+        $this->fake->queueData($this->customerFixture(), 201);
+
+        $this->puntjes()->customers->register(new CreateCustomer(
+            identifiers: [CreateIdentifier::loyaltyCard('7KQ4M2XP')],
+        ));
+
+        self::assertSame(
+            ['type' => 'loyalty_card', 'value' => '7KQ4M2XP', 'is_primary' => true],
+            $this->fake->bodyAt(1)['identifiers'][0],
+        );
     }
 
     public function test_a_partial_customer_update_distinguishes_omitted_from_null(): void
@@ -614,7 +636,7 @@ final class ResourceTest extends TestCase
     {
         $this->fake->queueData($this->customerFixture() + [
             'customer_since' => '2024-03-01',
-            'loyalty_card_code' => 'PNTJ-CARD-42',
+            'loyalty_card_code' => '7KQ4M2XP',
             'marketingConsent' => true,
             'marketingConsentGrantedAt' => '2026-03-03T09:00:00+00:00',
             'marketingConsentGrantedSource' => 'webshop',
@@ -626,7 +648,7 @@ final class ResourceTest extends TestCase
 
         self::assertSame('2024-03-01', $customer->customerSince);
         // Persist this as the QR value rather than digging through identifiers.
-        self::assertSame('PNTJ-CARD-42', $customer->loyaltyCardCode);
+        self::assertSame('7KQ4M2XP', $customer->loyaltyCardCode);
         self::assertTrue($customer->hasMarketingConsent());
         self::assertSame('webshop', $customer->marketingConsent->grantedSource);
         self::assertNull($customer->marketingConsent->withdrawnAt);
@@ -649,7 +671,7 @@ final class ResourceTest extends TestCase
         $this->fake->queueData($this->customerFixture(), 201);
 
         $this->puntjes()->customers->register(new CreateCustomer(
-            identifiers: [new CreateIdentifier(IdentifierType::Card, 'CARD-1')],
+            identifiers: [new CreateIdentifier(IdentifierType::LoyaltyCard, '7KQ4M2XP')],
             customerSince: '2024-03-01',
             marketingConsent: true,
         ));

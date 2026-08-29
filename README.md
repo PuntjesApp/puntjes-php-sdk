@@ -360,6 +360,34 @@ new UpdateCustomer(email: 'new@example.com')  // changes only the email
 new UpdateCustomer(phone: null)               // clears the phone number
 ```
 
+### Registering a customer, and what an identifier can be
+
+Send no identifiers and Puntjes issues the loyalty card itself. That is the common case,
+and it is the shortest correct call:
+
+```php
+$customer = $puntjes->customers->register(new CreateCustomer(firstName: 'Jan'));
+$customer->loyaltyCardCode;   // "7KQ4M2XP", 8 chars of A-Z0-9
+```
+
+Pass a loyalty card only when the customer already holds a printed one. The value must be
+a card your vendor has actually printed and not yet handed to anyone: the API matches it
+against its own card stock, case-insensitively, and refuses anything else with a 422
+`LOYALTY_CARD_NOT_FOUND`, or a 409 `IDENTIFIER_DUPLICATE` if that card already belongs to
+somebody. You cannot invent the value.
+
+```php
+new CreateCustomer(identifiers: [CreateIdentifier::loyaltyCard('7KQ4M2XP')]);
+new CreateCustomer(identifiers: [CreateIdentifier::email('jan@example.com')]);
+```
+
+Registration accepts those two types and nothing else. The scan technologies an earlier
+API supported (`card`, `qr`, `nfc`, `barcode`) were removed, with no alias window, so
+sending one is a 422 rather than a translation.
+
+`IdentifierType::Phone` still exists because the API still returns it on customers
+migrated before the change. It cannot be registered.
+
 ### Customer consent and the loyalty card code
 
 Registration returns the customer's card code at the top level — persist it as their QR
@@ -367,7 +395,7 @@ value rather than digging it back out of the identifier list:
 
 ```php
 $customer = $puntjes->customers->register($new);
-$customer->loyaltyCardCode;   // "PNTJ-…"
+$customer->loyaltyCardCode;   // "7KQ4M2XP", 8 chars of A-Z0-9
 ```
 
 Marketing consent comes back decided, with the provenance behind it, so nothing has to
