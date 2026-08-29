@@ -2,14 +2,21 @@
 
 Notable changes to `puntjes/php-sdk`. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this package follows
-[semantic versioning](https://semver.org/) — pre-1.0, so a minor bump may carry the
-narrowing type changes below.
+[semantic versioning](https://semver.org/). From 1.0.0 that promise is the ordinary one:
+a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
-## 0.3.0 — 2026-08-29
+## 1.0.0 — 2026-08-29
+
+The first stable release, and it carries one fix worth the version on its own.
 
 Fixes the customer registration contract, which had been wrong since the API collapsed
 its identifier types. **This release breaks `IdentifierType` and the `CreateIdentifier`
 factories.** Both changes are mechanical, and the old spellings could not have worked.
+
+Leaving Beta is the other half. Every endpoint on `routes/api/v1.php` is covered, the
+response models are checked field by field against the API's own Data classes, and the
+identifier defect below was the last known disagreement between the two. Pin `^1.0` and
+a breaking change will not reach you without a major bump.
 
 ### Fixed
 
