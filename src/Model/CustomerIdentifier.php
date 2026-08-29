@@ -7,7 +7,13 @@ namespace Puntjes\Model;
 use Puntjes\Enum\IdentifierType;
 use Puntjes\Support\Cast;
 
-/** A card, QR code, email or phone number a customer is recognised by. */
+/**
+ * A loyalty card or email address a customer is recognised by.
+ *
+ * `type` is null when the API sends a value this SDK version has no case for, which is
+ * what a client older than the API answers with. `rawType` always carries the wire value,
+ * so it is the field to read when a null type would otherwise look like no identifier.
+ */
 final class CustomerIdentifier
 {
     public function __construct(

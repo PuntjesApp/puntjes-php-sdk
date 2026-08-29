@@ -133,7 +133,7 @@ final class RetryTest extends TestCase
 
         try {
             $puntjes->customers->register(new CreateCustomer(
-                identifiers: [CreateIdentifier::card('CARD-NEW')],
+                identifiers: [CreateIdentifier::loyaltyCard('PNTJ-NEW')],
             ));
         } finally {
             // Registering twice would create two customers, so one attempt only.

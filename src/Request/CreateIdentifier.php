@@ -6,7 +6,7 @@ namespace Puntjes\Request;
 
 use Puntjes\Enum\IdentifierType;
 
-/** A loyalty identifier to attach to a new customer. */
+/** An identifier to attach to a new customer. */
 final class CreateIdentifier
 {
     public function __construct(
@@ -16,19 +16,15 @@ final class CreateIdentifier
         public readonly bool $isPrimary = false,
     ) {}
 
-    public static function card(string $value, bool $isPrimary = true): self
+    /** Omit identifiers entirely to have Puntjes issue the card and its code for you. */
+    public static function loyaltyCard(string $value, bool $isPrimary = true): self
     {
-        return new self(IdentifierType::Card, $value, $isPrimary);
+        return new self(IdentifierType::LoyaltyCard, $value, $isPrimary);
     }
 
     public static function email(string $value, bool $isPrimary = false): self
     {
         return new self(IdentifierType::Email, $value, $isPrimary);
-    }
-
-    public static function phone(string $value, bool $isPrimary = false): self
-    {
-        return new self(IdentifierType::Phone, $value, $isPrimary);
     }
 
     /** @return array<string, mixed> */

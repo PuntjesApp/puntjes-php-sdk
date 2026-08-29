@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Puntjes\Tests\Unit;
 
+use Puntjes\Enum\IdentifierType;
 use Puntjes\Enum\Period;
 use Puntjes\Tests\Support\TestCase;
 
@@ -17,6 +18,62 @@ use Puntjes\Tests\Support\TestCase;
  */
 final class ShapeChangeTest extends TestCase
 {
+    /**
+     * The type the API mints on every customer since phase 13. An SDK enum that predates
+     * the cutover has no case for it, so `tryFrom` answers null and the identifier reads
+     * as typeless while `rawType` quietly holds the truth.
+     */
+    public function test_a_loyalty_card_identifier_decodes_to_its_type(): void
+    {
+        $this->fake->queueData($this->customerWithIdentifierType('loyalty_card') + ['wallet_balance' => 0]);
+
+        $identifier = $this->puntjes()->customers->lookup(identifier: 'PNTJ-1')->primaryIdentifier();
+
+        self::assertSame(IdentifierType::LoyaltyCard, $identifier?->type);
+        self::assertSame('loyalty_card', $identifier?->rawType);
+    }
+
+    /**
+     * `phone` is retired for writes and kept for reads: the API's own enum retains it so
+     * migrated deactivated rows still hydrate. Dropping it from this SDK would reproduce
+     * the null-type defect above on exactly those rows.
+     */
+    public function test_a_migrated_phone_identifier_still_decodes(): void
+    {
+        $this->fake->queueData($this->customerWithIdentifierType('phone') + ['wallet_balance' => 0]);
+
+        $identifier = $this->puntjes()->customers->lookup(identifier: '+3230000000')->primaryIdentifier();
+
+        self::assertSame(IdentifierType::Phone, $identifier?->type);
+    }
+
+    /** The scan technologies the API removed outright. Nothing stores them, so nothing reads them. */
+    public function test_the_retired_scan_types_are_gone(): void
+    {
+        foreach (['card', 'qr', 'nfc', 'barcode'] as $retired) {
+            self::assertNull(IdentifierType::tryFrom($retired), "{$retired} should no longer be a case");
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function customerWithIdentifierType(string $type): array
+    {
+        return [
+            'id' => 42, 'first_name' => 'Jan', 'last_name' => 'Everaert',
+            'email' => 'jan@example.com', 'phone' => null, 'external_id' => 'PNU-1',
+            'date_of_birth' => null, 'locale' => 'nl',
+            'status' => ['value' => 'active', 'label' => 'Active'],
+            'identifiers' => [[
+                'id' => 7, 'type' => $type, 'value' => 'IDENT-1',
+                'is_active' => true, 'is_primary' => true,
+                'created_at' => '2026-01-01T00:00:00+00:00',
+            ]],
+            'deactivated_at' => null, 'anonymized_at' => null,
+            'created_at' => '2026-01-01T00:00:00+00:00',
+            'updated_at' => '2026-01-01T00:00:00+00:00',
+        ];
+    }
+
     public function test_a_campaign_that_multiplies_nothing_still_decodes(): void
     {
         // A customer-moment campaign — a birthday gift — has no multiplier and no
