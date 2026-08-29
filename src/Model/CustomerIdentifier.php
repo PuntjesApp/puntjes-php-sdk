@@ -8,7 +8,8 @@ use Puntjes\Enum\IdentifierType;
 use Puntjes\Support\Cast;
 
 /**
- * A loyalty card or email address a customer is recognised by.
+ * A loyalty card or email address a customer is recognised by, or a phone number on an
+ * account migrated before the API retired them.
  *
  * `type` is null when the API sends a value this SDK version has no case for, which is
  * what a client older than the API answers with. `rawType` always carries the wire value,

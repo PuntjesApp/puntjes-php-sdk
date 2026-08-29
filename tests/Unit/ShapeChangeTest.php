@@ -19,15 +19,15 @@ use Puntjes\Tests\Support\TestCase;
 final class ShapeChangeTest extends TestCase
 {
     /**
-     * The type the API mints on every customer since phase 13. An SDK enum that predates
-     * the cutover has no case for it, so `tryFrom` answers null and the identifier reads
-     * as typeless while `rawType` quietly holds the truth.
+     * The type the API mints on every customer. An SDK enum without a case for it answers
+     * null from `tryFrom`, so the identifier reads as typeless while `rawType` holds the
+     * truth, and code filtering by type finds nothing and raises nothing.
      */
     public function test_a_loyalty_card_identifier_decodes_to_its_type(): void
     {
         $this->fake->queueData($this->customerWithIdentifierType('loyalty_card') + ['wallet_balance' => 0]);
 
-        $identifier = $this->puntjes()->customers->lookup(identifier: 'PNTJ-1')->primaryIdentifier();
+        $identifier = $this->puntjes()->customers->lookup(identifier: '7KQ4M2XP')->primaryIdentifier();
 
         self::assertSame(IdentifierType::LoyaltyCard, $identifier?->type);
         self::assertSame('loyalty_card', $identifier?->rawType);
@@ -64,7 +64,7 @@ final class ShapeChangeTest extends TestCase
             'date_of_birth' => null, 'locale' => 'nl',
             'status' => ['value' => 'active', 'label' => 'Active'],
             'identifiers' => [[
-                'id' => 7, 'type' => $type, 'value' => 'IDENT-1',
+                'id' => 7, 'type' => $type, 'value' => '7KQ4M2XP',
                 'is_active' => true, 'is_primary' => true,
                 'created_at' => '2026-01-01T00:00:00+00:00',
             ]],

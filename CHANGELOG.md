@@ -18,6 +18,12 @@ factories.** Both changes are mechanical, and the old spellings could not have w
   the API issues on every customer. Code filtering identifiers by type found nothing and
   raised nothing, which is the worst shape a defect can take. **This is the change worth
   upgrading for on its own**, and it needs no edit on your side.
+- **The documented loyalty-card format was wrong.** The README showed `PNTJ-...`, which
+  is the prefix on a redemption confirmation code, not a card. A card code is 8 characters
+  of `A-Z0-9` with no prefix. The README now also states the rule that will otherwise
+  surprise you: a `loyalty_card` value you submit must match a card the vendor has printed
+  and not yet assigned, or the API answers `LOYALTY_CARD_NOT_FOUND` (422) or
+  `IDENTIFIER_DUPLICATE` (409).
 - **A customer can be registered with no identifiers.** `CreateCustomer` threw when
   `identifiers` was empty, while the API treats the empty array as the normal case and
   issues the loyalty card itself. The recommended registration flow was unreachable

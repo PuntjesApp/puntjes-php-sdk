@@ -16,7 +16,11 @@ final class CreateIdentifier
         public readonly bool $isPrimary = false,
     ) {}
 
-    /** Omit identifiers entirely to have Puntjes issue the card and its code for you. */
+    /**
+     * The value must be a card the vendor has printed and not yet assigned. Matching is
+     * case-insensitive; anything else is refused with `LOYALTY_CARD_NOT_FOUND` (422), or
+     * `IDENTIFIER_DUPLICATE` (409) when the card already belongs to someone.
+     */
     public static function loyaltyCard(string $value, bool $isPrimary = true): self
     {
         return new self(IdentifierType::LoyaltyCard, $value, $isPrimary);

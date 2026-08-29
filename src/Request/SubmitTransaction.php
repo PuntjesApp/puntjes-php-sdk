@@ -31,7 +31,7 @@ final class SubmitTransaction
     public readonly string $idempotencyKey;
 
     /**
-     * @param  string  $identifier  The value of a customer's loyalty identifier — the scanned card, QR or email.
+     * @param  string  $identifier  A customer's loyalty card code or email.
      * @param  int  $totalAmount  Order total in cents. Must be at least 1.
      * @param  array<int, LineItem>  $items  Up to 200 lines.
      * @param  string|null  $externalReference  Your order/receipt number, for reconciliation.

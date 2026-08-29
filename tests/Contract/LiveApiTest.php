@@ -115,6 +115,33 @@ final class LiveApiTest extends TestCase
         }
     }
 
+    /**
+     * The drift this suite exists for, on the one field a unit fixture cannot police: a
+     * type the API sends that this SDK has no case for decodes to null, silently, and the
+     * unit fixtures cannot notice because the SDK author wrote them from the same
+     * assumption. `rawType` is what separates "the API sent something new" from "the API
+     * sent nothing".
+     *
+     * Read-only, and skipped unless someone names a customer. This suite deliberately
+     * creates no customer data, because the API cannot delete it again.
+     */
+    public function test_every_identifier_the_api_returns_has_a_type_this_sdk_knows(): void
+    {
+        $identifier = getenv('PUNTJES_CONTRACT_CUSTOMER_IDENTIFIER') ?: '';
+
+        if ($identifier === '') {
+            self::markTestSkipped('Set PUNTJES_CONTRACT_CUSTOMER_IDENTIFIER to an existing customer identifier to run this.');
+        }
+
+        $customer = $this->puntjes()->customers->lookup(identifier: $identifier);
+
+        self::assertNotSame([], $customer->identifiers, 'The customer carries no identifiers to check.');
+
+        foreach ($customer->identifiers as $each) {
+            self::assertNotNull($each->type, "The API sent identifier type '{$each->rawType}', which this SDK has no case for.");
+        }
+    }
+
     public function test_find_by_identifier_returns_null_for_an_unknown_card(): void
     {
         self::assertNull(
