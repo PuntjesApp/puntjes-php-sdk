@@ -19,16 +19,21 @@ final class Transactions extends Resource
     /**
      * Record a purchase and award the points its earn rules produce. Responds 201.
      *
-     * Safe to retry: the request carries an idempotency key, so a replay returns the
-     * original transaction rather than awarding points twice. Note that the replayed
-     * response reports `pointsEarned: 0` — the points from the first call still
-     * stand. Read the wallet if you need the balance.
+     * Safe to retry: the request carries an idempotency key, so a replay for the same
+     * customer and the same `totalAmount` returns the original transaction rather than
+     * awarding points twice. Note that the replayed response reports `pointsEarned: 0`
+     * — the points from the first call still stand. Read the wallet if you need the
+     * balance. Reusing a key for a DIFFERENT customer or amount is rejected with
+     * `IDEMPOTENCY_KEY_CONFLICT`, and nothing is recorded, rather than returning the
+     * unrelated transaction that key belongs to.
      *
      * Which shop it happened at comes from `SubmitTransaction(branch: …)`, falling back
      * to the branch the API credential defaults to, and then to none at all.
      *
      * @throws NotFoundException (`CUSTOMER_NOT_FOUND`) for an unknown identifier.
      * @throws ApiException (`CUSTOMER_DEACTIVATED`, 422) when the customer cannot transact.
+     * @throws ApiException (`IDEMPOTENCY_KEY_CONFLICT`, 422) when the key was already used
+     *                      for another customer or another `totalAmount`.
      * @throws ApiException (`BRANCH_NOT_FOUND` or `BRANCH_INACTIVE`, 422) when the branch
      *                      key names nothing, or names a shop the vendor has closed.
      *                      Nothing is recorded either way.

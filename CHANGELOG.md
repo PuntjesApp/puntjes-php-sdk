@@ -5,6 +5,19 @@ Notable changes to `puntjes/php-sdk`. The format follows
 [semantic versioning](https://semver.org/). From 1.0.0 that promise is the ordinary one:
 a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
+## Unreleased
+
+### Changed
+
+- **`POST /transactions` now refuses a reused idempotency key that names another
+  customer or another `totalAmount`.** The API used to echo the original transaction,
+  so a till that reused a key by mistake was told "recorded" for a customer whose wallet
+  had not moved. It now answers `422 IDEMPOTENCY_KEY_CONFLICT`, the same contract the
+  adjust and redeem endpoints already had, and nothing is written. The SDK already
+  maps that answer to an `ApiException` carrying the code; this release documents it on
+  `Transactions::submit()` and `SubmitTransaction`, and pins the mapping with a test. No
+  code change is needed on your side unless you relied on the echo.
+
 ## 1.0.0 — 2026-08-29
 
 The first stable release, and it carries one fix worth the version on its own.

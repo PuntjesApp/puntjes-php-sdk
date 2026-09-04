@@ -115,8 +115,9 @@ new SubmitTransaction(
 );
 ```
 
-Keys are scoped per vendor. Reusing one for a different customer or reward returns
-`IDEMPOTENCY_KEY_CONFLICT` rather than someone else's confirmation code.
+Keys are scoped per vendor. Reusing one for a different customer, a different
+`totalAmount` or a different reward returns `IDEMPOTENCY_KEY_CONFLICT` rather than
+someone else's transaction or confirmation code, and nothing is written.
 
 ## Branches
 
