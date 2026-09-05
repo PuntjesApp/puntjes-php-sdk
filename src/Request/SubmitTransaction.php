@@ -25,6 +25,11 @@ use Puntjes\Support\Uuid;
  *         totalAmount: 4200,
  *         idempotencyKey: 'order-'.$order->id,
  *     );
+ *
+ * The key is scoped per vendor, so reusing one for a different customer or a different
+ * `totalAmount` is an error the API reports as `IDEMPOTENCY_KEY_CONFLICT` rather than
+ * silently returning someone else's transaction. Derive keys from something unique to
+ * this purchase, never from a fixed string.
  */
 final class SubmitTransaction
 {
