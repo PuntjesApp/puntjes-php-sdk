@@ -54,6 +54,13 @@ enum ErrorCode: string
 
     // Loyalty card delivery
     case CustomerHasNoEmail = 'CUSTOMER_HAS_NO_EMAIL';
+    /**
+     * Earlier mail to the customer's address bounced or was marked as spam, so the API
+     * refuses to send the card (422). Nothing is queued and the per-customer cooldown is
+     * not spent: ask for an address that works, or switch sending back on from the
+     * customer's page in the admin portal.
+     */
+    case CustomerEmailSuppressed = 'CUSTOMER_EMAIL_SUPPRESSED';
     case LoyaltyCardNotFound = 'LOYALTY_CARD_NOT_FOUND';
     case CardSendThrottled = 'CARD_SEND_THROTTLED';
 

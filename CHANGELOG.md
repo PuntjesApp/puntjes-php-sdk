@@ -5,6 +5,19 @@ Notable changes to `puntjes/php-sdk`. The format follows
 [semantic versioning](https://semver.org/). From 1.0.0 that promise is the ordinary one:
 a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
+## Unreleased
+
+### Added
+
+- **`ErrorCode::CustomerEmailSuppressed`** (`CUSTOMER_EMAIL_SUPPRESSED`, 422), the
+  answer both send-card operations give when earlier mail to the customer's address
+  bounced or was marked as spam. The API refuses before it queues anything, so the
+  per-customer cooldown is not spent. A till that catches it asks for an address that
+  works; the vendor can also switch sending back on from the customer's page in the admin
+  portal. Older SDK versions already surface the code through `ApiException::code()`;
+  this release names it on the enum, documents it on `Customers::sendCard()` and
+  `sendCardByExternalId()`, and pins the mapping with a test.
+
 ## 1.1.0 — 2026-09-30
 
 ### Added

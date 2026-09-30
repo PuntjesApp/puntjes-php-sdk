@@ -31,6 +31,7 @@ final class ErrorMappingTest extends TestCase
             '409 duplicate identifier' => [409, 'IDENTIFIER_DUPLICATE', ConflictException::class],
             '422 domain refusal' => [422, 'INSUFFICIENT_BALANCE', ApiException::class],
             '422 idempotency conflict' => [422, 'IDEMPOTENCY_KEY_CONFLICT', ApiException::class],
+            '422 email suppressed' => [422, 'CUSTOMER_EMAIL_SUPPRESSED', ApiException::class],
             '422 validation' => [422, 'VALIDATION_ERROR', ValidationException::class],
             '429 rate limited' => [429, 'RATE_LIMITED', RateLimitException::class],
             '429 plan limit' => [429, 'PLAN_LIMIT_EXCEEDED', PlanLimitExceededException::class],
