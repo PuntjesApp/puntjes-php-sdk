@@ -289,6 +289,7 @@ $puntjes->rewards->list();
 $puntjes->rewards->list(affordableFor: 'CARD-1');
 $puntjes->redemptions->create(new CreateRedemption('CARD-1', rewardId: 3));
 $puntjes->redemptions->find('PNTJ-ABC123');
+$puntjes->redemptions->forCustomer(42, RedemptionStatus::Valid);   // rewards still to collect, no code needed
 $puntjes->redemptions->verify('PNTJ-ABC123');
 
 // Campaign bonnen — the vouchers a campaign gives away. Verifying SPENDS one.

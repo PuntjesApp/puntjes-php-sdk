@@ -11,8 +11,9 @@ use Puntjes\Support\Cast;
 /**
  * A reward exchanged for points, identified by its confirmation code.
  *
- * The three endpoints that return a redemption send overlapping — not identical —
- * field sets, so some properties are null depending on how you got here:
+ * The endpoints that return a redemption send overlapping — not identical —
+ * field sets, so some properties are null depending on how you got here.
+ * `forCustomer()` sends the same fields as `find()`:
  *
  * | Field              | create() | find() | verify() |
  * |--------------------|----------|--------|----------|
