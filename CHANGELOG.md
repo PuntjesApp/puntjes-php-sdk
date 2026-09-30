@@ -5,7 +5,18 @@ Notable changes to `puntjes/php-sdk`. The format follows
 [semantic versioning](https://semver.org/). From 1.0.0 that promise is the ordinary one:
 a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
-## Unreleased
+## 1.1.0 — 2026-09-30
+
+### Added
+
+- **`Redemptions::forCustomer(int $customerId, ?RedemptionStatus $status = null)`**, for
+  `GET /customers/{customer}/redemptions`. It pages through one customer's redemptions,
+  newest first, 15 per page. A till whose customer comes to collect a reward without the
+  confirmation code looks the customer up by card, asks for `RedemptionStatus::Valid`, and
+  verifies the one the customer picks. The status is the one each code has at the moment
+  of the request: a code past its expiry reads `expired` and is left out of `Valid`, even
+  before anyone looked it up. Each item has the same fields as `find()`. A customer of
+  another vendor answers `CUSTOMER_NOT_FOUND`.
 
 ### Changed
 

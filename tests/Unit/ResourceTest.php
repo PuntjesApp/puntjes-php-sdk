@@ -371,6 +371,47 @@ final class ResourceTest extends TestCase
         self::assertStringEndsWith('/redemptions/A%2FB%20C', $this->fake->uriAt(1));
     }
 
+    public function test_a_customers_redemptions_paginate_and_pass_the_status_filter(): void
+    {
+        $redemption = fn (int $id, string $status): array => [
+            'redemption_id' => $id,
+            'confirmation_code' => 'PNTJ-0000000'.$id,
+            'status' => $status,
+            'reward' => ['name' => 'Gratis koffie', 'type' => 'free_product'],
+            'customer' => ['name' => 'Jan Everaert'],
+            'points_deducted' => 100,
+            'redeemed_at' => '2026-09-30T10:00:00+00:00',
+            'verified_at' => null,
+            'expires_at' => null,
+            'type_specific_data' => ['product_reference' => 'SKU-COFFEE'],
+        ];
+
+        $this->fake->queuePage([$redemption(2, 'valid')], currentPage: 1, lastPage: 2, total: 2);
+        $this->fake->queuePage([$redemption(1, 'valid')], currentPage: 2, lastPage: 2, total: 2);
+
+        $open = $this->puntjes()->redemptions
+            ->forCustomer(42, RedemptionStatus::Valid)
+            ->all();
+
+        self::assertCount(2, $open);
+        self::assertSame('PNTJ-00000002', $open[0]->confirmationCode);
+        self::assertSame(RedemptionStatus::Valid, $open[1]->status);
+        self::assertSame('Jan Everaert', $open[1]->customerName);
+        self::assertStringContainsString('/customers/42/redemptions', $this->fake->uriAt(1));
+        self::assertStringContainsString('status=valid', $this->fake->uriAt(1));
+        self::assertStringContainsString('page=2', $this->fake->uriAt(2));
+    }
+
+    public function test_a_customers_redemptions_without_a_status_send_no_filter(): void
+    {
+        $this->fake->queuePage([], currentPage: 1, lastPage: 1, total: 0);
+
+        $this->puntjes()->redemptions->forCustomer(42)->all();
+
+        self::assertStringContainsString('/customers/42/redemptions', $this->fake->uriAt(1));
+        self::assertStringNotContainsString('status=', $this->fake->uriAt(1));
+    }
+
     /** @return array<string, mixed> */
     private function productFixture(string $externalId = 'SKU-1'): array
     {

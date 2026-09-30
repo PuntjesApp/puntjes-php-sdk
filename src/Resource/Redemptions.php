@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Puntjes\Resource;
 
+use Puntjes\Enum\RedemptionStatus;
 use Puntjes\Exception\ApiException;
 use Puntjes\Exception\NotFoundException;
 use Puntjes\Model\Redemption;
+use Puntjes\Pagination\Page;
+use Puntjes\Pagination\Paginator;
 use Puntjes\Request\CreateRedemption;
 
 /**
@@ -53,6 +56,30 @@ final class Redemptions extends Resource
         return Redemption::fromArray(
             $this->transport->get('/redemptions/'.$this->segment($confirmationCode))->dataArray(),
         );
+    }
+
+    /**
+     * A customer's redemptions, newest first, 15 per page: the call for a till whose
+     * customer comes to collect a reward without the confirmation code.
+     *
+     * Pass `RedemptionStatus::Valid` for the rewards still to collect, then `verify()`
+     * the one the customer picks. Each status is the one the code has at the moment
+     * of the request, so a code past its expiry reads `expired` and is left out of
+     * `Valid` even before anyone looked it up. The list only reads; it never writes.
+     *
+     * @return Paginator<Redemption>
+     *
+     * @throws NotFoundException `CUSTOMER_NOT_FOUND`, also for a customer of another vendor.
+     */
+    public function forCustomer(int $customerId, ?RedemptionStatus $status = null): Paginator
+    {
+        $query = $status === null ? [] : ['status' => $status->value];
+        $path = '/customers/'.$this->segment($customerId).'/redemptions';
+
+        return new Paginator(fn (int $page): Page => Page::fromResponse(
+            $this->transport->get($path, $query + ['page' => $page]),
+            Redemption::fromArray(...),
+        ));
     }
 
     /**
