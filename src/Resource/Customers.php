@@ -151,9 +151,14 @@ final class Customers extends Resource
      *
      * @param  string|null  $channel  Omit for the default. `email` is the only channel today.
      *
+     * `CUSTOMER_EMAIL_SUPPRESSED` is the other refusal to expect: earlier mail to the
+     * address bounced or was marked as spam, so nothing is queued and the cooldown is not
+     * spent. Ask for an address that works, or switch sending back on from the customer's
+     * page in the admin portal.
+     *
      * @throws NotFoundException `CUSTOMER_NOT_FOUND` (404).
-     * @throws ApiException `CUSTOMER_HAS_NO_EMAIL`, `LOYALTY_CARD_NOT_FOUND` or
-     *                      `CARD_SEND_THROTTLED`.
+     * @throws ApiException `CUSTOMER_HAS_NO_EMAIL`, `CUSTOMER_EMAIL_SUPPRESSED`,
+     *                      `LOYALTY_CARD_NOT_FOUND` or `CARD_SEND_THROTTLED` (all 422).
      */
     public function sendCard(int $customerId, ?string $channel = null): CardDelivery
     {
@@ -172,6 +177,7 @@ final class Customers extends Resource
      * never has to store a Puntjes primary key.
      *
      * @throws NotFoundException `EXTERNAL_ID_NOT_FOUND` (404).
+     * @throws ApiException the same 422 refusals as {@see sendCard()}.
      */
     public function sendCardByExternalId(string $externalId, ?string $channel = null): CardDelivery
     {

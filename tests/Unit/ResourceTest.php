@@ -784,6 +784,25 @@ final class ResourceTest extends TestCase
         self::assertSame(['channel' => 'email'], $this->fake->bodyAt(1));
     }
 
+    public function test_a_card_send_to_a_suppressed_address_is_a_domain_refusal(): void
+    {
+        // Earlier mail to the address bounced or was marked as spam. The API refuses
+        // before it queues anything, so the cooldown is not spent and a till can ask
+        // for another address instead of telling the customer the card is on its way.
+        $this->fake->queueError(422, 'CUSTOMER_EMAIL_SUPPRESSED', 'Mail to this address bounced.');
+
+        try {
+            $this->puntjes()->customers->sendCard(42);
+            self::fail('Expected an ApiException.');
+        } catch (ApiException $e) {
+            self::assertTrue($e->is(ErrorCode::CustomerEmailSuppressed));
+            self::assertSame(ErrorCode::CustomerEmailSuppressed, $e->errorCode());
+            self::assertSame(422, $e->status());
+        }
+
+        self::assertSame(1, $this->fake->apiRequestCount());
+    }
+
     public function test_a_card_send_is_never_retried(): void
     {
         // A replay mails the customer a second time, so a lost response must not be
