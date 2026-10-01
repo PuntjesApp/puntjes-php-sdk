@@ -17,6 +17,27 @@ a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
   portal. Older SDK versions already surface the code through `ApiException::code()`;
   this release names it on the enum, documents it on `Customers::sendCard()` and
   `sendCardByExternalId()`, and pins the mapping with a test.
+- **An extra amount on free-product rewards**, for a reward that costs points plus money
+  ("500 points + € 2,00"). The till collects the money; Puntjes does not. The amount is in
+  cents, and `0` means points only:
+  - `RewardSummary::$extraAmount` (`GET /rewards`) and `Reward::$extraAmount`
+    (`createReward()`), so a till or webshop can show the amount before the customer picks.
+  - `Redemption::extraAmount()`, the amount to collect for that redemption; `0` for a
+    discount.
+  - `CreateRewardFromProduct::$extraAmount`, an optional last argument that
+    `createReward()` sends as `extra_amount`.
+  The new properties and the new argument come last, with a default, so code that builds
+  these classes by position keeps working. An API that does not send `extra_amount` yet
+  reads as `0`.
+
+### Changed
+
+- **`Redemption::$typeSpecificData` is now a copy made at the moment of redemption.** If
+  the vendor edits the reward afterwards, `find()`, `forCustomer()` and `verify()` still
+  answer the values the customer redeemed: the extra amount and the product reference of a
+  free product, and the discount value and type of a discount. Before, those calls read the
+  reward as it was at the time of the call. The SDK code did not change for this; the
+  docblocks now say it.
 
 ## 1.1.0 — 2026-09-30
 

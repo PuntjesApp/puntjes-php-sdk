@@ -25,11 +25,15 @@ use Puntjes\Support\Cast;
  * | expiresAt          | ✓        | ✓      | –        |
  *
  * `create()` omits status because a freshly created redemption is always valid.
+ *
+ * `typeSpecificData` is a copy made at the moment of redemption. If the vendor edits the
+ * reward afterwards, `find()`, `forCustomer()` and `verify()` still answer the old values.
  */
 final class Redemption
 {
     /**
-     * @param  array<string, mixed>  $typeSpecificData  Discount value/unit, or the free product's reference.
+     * @param  array<string, mixed>  $typeSpecificData  `discount_value` and `discount_type` for a discount;
+     *                                                  `product_reference` and `extra_amount` for a free product.
      */
     public function __construct(
         public readonly int $id,
@@ -72,6 +76,14 @@ final class Redemption
     public function isVerified(): bool
     {
         return $this->verifiedAt !== null || $this->status === RedemptionStatus::Used;
+    }
+
+    /** What the till collects on top of the points, in cents. 0 for a discount, or a reward that costs points only. */
+    public function extraAmount(): int
+    {
+        $amount = $this->typeSpecificData['extra_amount'] ?? 0;
+
+        return is_int($amount) ? $amount : 0;
     }
 
     /**

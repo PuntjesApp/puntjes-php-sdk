@@ -20,6 +20,7 @@ final class CreateRewardFromProduct
      * @param  string|null  $availableFrom  `Y-m-d`.
      * @param  string|null  $availableUntil  `Y-m-d`.
      * @param  int|null  $codeValidForHours  Confirmation-code lifetime. Null means it never expires.
+     * @param  int|null  $extraAmount  What the till collects on top of the points, in cents. Null or 0 means points only.
      */
     public function __construct(
         public readonly int $pointCost,
@@ -30,6 +31,7 @@ final class CreateRewardFromProduct
         public readonly ?string $availableFrom = null,
         public readonly ?string $availableUntil = null,
         public readonly ?int $codeValidForHours = null,
+        public readonly ?int $extraAmount = null,
     ) {}
 
     /** @return array<string, mixed> */
@@ -47,6 +49,7 @@ final class CreateRewardFromProduct
             'available_from' => $this->availableFrom,
             'available_until' => $this->availableUntil,
             'code_valid_for_hours' => $this->codeValidForHours,
+            'extra_amount' => $this->extraAmount,
         ];
 
         foreach ($optional as $key => $value) {

@@ -38,6 +38,12 @@ final class RewardSummary
          * @var array<int, Branch>|null
          */
         public readonly ?array $branches = null,
+        /**
+         * What the till collects on top of the points, in cents. 0 means points only.
+         *
+         * Show it next to the points ("500 points + € 2,00") so the customer knows before they pick.
+         */
+        public readonly int $extraAmount = 0,
     ) {}
 
     /** @param array<array-key, mixed> $data */
@@ -58,6 +64,7 @@ final class RewardSummary
             availableUntil: Cast::nullableString($data, 'available_until'),
             rawType: $rawType,
             branches: Branch::scopeFromArray($data),
+            extraAmount: Cast::int($data, 'extra_amount'),
         );
     }
 

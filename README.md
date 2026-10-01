@@ -423,6 +423,22 @@ multiplier and a schedule; a `customer_moment` one (a birthday gift, say) carrie
 neither and sends null for `multiplier`, `recurrenceType` and `recurrenceConfig`.
 Branch on `family` before reading any of the three.
 
+### A reward can cost points plus an amount
+
+A free-product reward can ask for money on top of the points, for example "500 points +
+€ 2,00". Puntjes does not take that money; the till collects it. The amount is in cents,
+and `0` means points only.
+
+```php
+$rewards[0]->extraAmount;       // 200: show it next to the points before the customer picks
+$redemption->extraAmount();     // 200: collect this at the till; always 0 for a discount
+$puntjes->products->createReward('SKU-1', new CreateRewardFromProduct(pointCost: 500, extraAmount: 200));
+```
+
+A redemption keeps a copy of what it was worth when it was made. If the vendor changes the
+reward later, `find()`, `forCustomer()` and `verify()` still answer the old amount, so
+collect what the redemption says, not what the catalogue says today.
+
 ## Token storage
 
 By default tokens live in memory for one PHP process, which under PHP-FPM means one
