@@ -32,6 +32,11 @@ a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
 ### Changed
 
+- **`Campaign::$config['scope']` can read `whole` or `whole_purchase`, and both mean the whole
+  purchase.** The campaign builder stores `whole`; campaigns older than campaign families
+  store `whole_purchase`. A `days_of_week` schedule from an older release can also store
+  Sunday as `7` next to `0`. The SDK hands `config` and `recurrenceConfig` over as the API
+  sends them, and a test now pins that, so no stricter model refuses a live campaign.
 - **`Redemption::$typeSpecificData` is now a copy made at the moment of redemption.** If
   the vendor edits the reward afterwards, `find()`, `forCustomer()` and `verify()` still
   answer the values the customer redeemed: the extra amount and the product reference of a
