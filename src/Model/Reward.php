@@ -37,6 +37,8 @@ final class Reward
         public readonly ?string $createdAt,
         public readonly ?string $updatedAt,
         public readonly string $rawType,
+        /** What the till collects on top of the points, in cents. 0 means points only. */
+        public readonly int $extraAmount = 0,
     ) {}
 
     /** @param array<array-key, mixed> $data */
@@ -64,6 +66,7 @@ final class Reward
             createdAt: Cast::nullableString($data, 'created_at'),
             updatedAt: Cast::nullableString($data, 'updated_at'),
             rawType: $rawType,
+            extraAmount: Cast::int($data, 'extra_amount'),
         );
     }
 }

@@ -6,6 +6,7 @@ namespace Puntjes\Tests\Unit;
 
 use Puntjes\Enum\IdentifierType;
 use Puntjes\Enum\Period;
+use Puntjes\Request\CreateRedemption;
 use Puntjes\Tests\Support\TestCase;
 
 /**
@@ -114,6 +115,32 @@ final class ShapeChangeTest extends TestCase
 
         self::assertSame(2, $campaign?->multiplier);
         self::assertSame(['days' => ['friday']], $campaign?->recurrenceConfig);
+    }
+
+    /**
+     * An API from before `extra_amount` sends no such key. The SDK reads 0, which is what the
+     * field means: points only. A reward and a redemption from that API must not read as broken.
+     */
+    public function test_a_reward_and_a_redemption_from_before_the_extra_amount_read_points_only(): void
+    {
+        $this->fake->queueData([[
+            'id' => 1, 'name' => 'Gratis koffie', 'description' => null, 'type' => 'free_product',
+            'point_cost' => 100, 'image_url' => null, 'remaining_stock' => 5, 'total_stock' => 10,
+            'available_from' => null, 'available_until' => null,
+        ]]);
+        $this->fake->queueData([
+            'redemption_id' => 11, 'confirmation_code' => 'PNTJ-COFFEE01',
+            'reward' => ['name' => 'Gratis koffie', 'type' => 'free_product'],
+            'points_deducted' => 100, 'remaining_balance' => 0,
+            'redeemed_at' => '2026-07-30T10:00:00+00:00', 'expires_at' => null,
+            'type_specific_data' => ['product_reference' => 'SKU-COFFEE'],
+        ], 201);
+
+        $reward = $this->puntjes()->rewards->list()[0];
+        $redemption = $this->puntjes()->redemptions->create(new CreateRedemption('CARD-1', rewardId: 1, idempotencyKey: 'old-1'));
+
+        self::assertSame(0, $reward->extraAmount);
+        self::assertSame(0, $redemption->extraAmount());
     }
 
     public function test_a_statistics_envelope_without_a_loyalty_block_decodes(): void
