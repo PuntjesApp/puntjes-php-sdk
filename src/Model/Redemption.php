@@ -33,7 +33,7 @@ final class Redemption
 {
     /**
      * @param  array<string, mixed>  $typeSpecificData  `discount_value` and `discount_type` for a discount;
-     *                                                  `product_reference` and `extra_amount` for a free product.
+     *                                                  `product_reference` and `payment_amount` for a free product.
      */
     public function __construct(
         public readonly int $id,
@@ -79,9 +79,9 @@ final class Redemption
     }
 
     /** What the till collects on top of the points, in cents. 0 for a discount, or a reward that costs points only. */
-    public function extraAmount(): int
+    public function paymentAmount(): int
     {
-        $amount = $this->typeSpecificData['extra_amount'] ?? 0;
+        $amount = $this->typeSpecificData['payment_amount'] ?? 0;
 
         return is_int($amount) ? $amount : 0;
     }

@@ -430,9 +430,9 @@ A free-product reward can ask for money on top of the points, for example "500 p
 and `0` means points only.
 
 ```php
-$rewards[0]->extraAmount;       // 200: show it next to the points before the customer picks
-$redemption->extraAmount();     // 200: collect this at the till; always 0 for a discount
-$puntjes->products->createReward('SKU-1', new CreateRewardFromProduct(pointCost: 500, extraAmount: 200));
+$rewards[0]->paymentAmount;       // 200: show it next to the points before the customer picks
+$redemption->paymentAmount();     // 200: collect this at the till; always 0 for a discount
+$puntjes->products->createReward('SKU-1', new CreateRewardFromProduct(pointCost: 500, paymentAmount: 200));
 ```
 
 A redemption keeps a copy of what it was worth when it was made. If the vendor changes the

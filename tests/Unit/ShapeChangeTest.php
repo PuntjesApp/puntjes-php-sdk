@@ -157,10 +157,10 @@ final class ShapeChangeTest extends TestCase
     }
 
     /**
-     * An API from before `extra_amount` sends no such key. The SDK reads 0, which is what the
+     * An API from before `payment_amount` sends no such key. The SDK reads 0, which is what the
      * field means: points only. A reward and a redemption from that API must not read as broken.
      */
-    public function test_a_reward_and_a_redemption_from_before_the_extra_amount_read_points_only(): void
+    public function test_a_reward_and_a_redemption_from_before_the_payment_amount_read_points_only(): void
     {
         $this->fake->queueData([[
             'id' => 1, 'name' => 'Gratis koffie', 'description' => null, 'type' => 'free_product',
@@ -178,8 +178,8 @@ final class ShapeChangeTest extends TestCase
         $reward = $this->puntjes()->rewards->list()[0];
         $redemption = $this->puntjes()->redemptions->create(new CreateRedemption('CARD-1', rewardId: 1, idempotencyKey: 'old-1'));
 
-        self::assertSame(0, $reward->extraAmount);
-        self::assertSame(0, $redemption->extraAmount());
+        self::assertSame(0, $reward->paymentAmount);
+        self::assertSame(0, $redemption->paymentAmount());
     }
 
     public function test_a_statistics_envelope_without_a_loyalty_block_decodes(): void
