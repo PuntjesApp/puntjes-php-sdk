@@ -20,14 +20,14 @@ a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 - **An extra amount on free-product rewards**, for a reward that costs points plus money
   ("500 points + € 2,00"). The till collects the money; Puntjes does not. The amount is in
   cents, and `0` means points only:
-  - `RewardSummary::$extraAmount` (`GET /rewards`) and `Reward::$extraAmount`
+  - `RewardSummary::$paymentAmount` (`GET /rewards`) and `Reward::$paymentAmount`
     (`createReward()`), so a till or webshop can show the amount before the customer picks.
-  - `Redemption::extraAmount()`, the amount to collect for that redemption; `0` for a
+  - `Redemption::paymentAmount()`, the amount to collect for that redemption; `0` for a
     discount.
-  - `CreateRewardFromProduct::$extraAmount`, an optional last argument that
-    `createReward()` sends as `extra_amount`.
+  - `CreateRewardFromProduct::$paymentAmount`, an optional last argument that
+    `createReward()` sends as `payment_amount`.
   The new properties and the new argument come last, with a default, so code that builds
-  these classes by position keeps working. An API that does not send `extra_amount` yet
+  these classes by position keeps working. An API that does not send `payment_amount` yet
   reads as `0`.
 
 ### Changed

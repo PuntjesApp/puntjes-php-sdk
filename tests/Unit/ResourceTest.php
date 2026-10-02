@@ -314,31 +314,31 @@ final class ResourceTest extends TestCase
         self::assertStringContainsString('identifier=CARD-1', $this->fake->uriAt(1));
     }
 
-    public function test_the_reward_catalogue_names_the_extra_amount_the_till_collects(): void
+    public function test_the_reward_catalogue_names_the_payment_amount_the_till_collects(): void
     {
         $this->fake->queueData([
             [
                 'id' => 2, 'name' => 'Steak', 'description' => null, 'type' => 'free_product',
                 'point_cost' => 500, 'image_url' => null, 'remaining_stock' => 5, 'total_stock' => null,
-                'available_from' => null, 'available_until' => null, 'extra_amount' => 1999,
+                'available_from' => null, 'available_until' => null, 'payment_amount' => 1999,
             ],
         ]);
 
         $rewards = $this->puntjes()->rewards->list();
 
-        self::assertSame(1999, $rewards[0]->extraAmount);
+        self::assertSame(1999, $rewards[0]->paymentAmount);
     }
 
-    public function test_a_redemption_tells_the_till_the_extra_amount_to_collect(): void
+    public function test_a_redemption_tells_the_till_the_payment_amount_to_collect(): void
     {
-        $this->fake->queueData($this->redemptionWith(['product_reference' => 'STEAK-01', 'extra_amount' => 200]), 201);
+        $this->fake->queueData($this->redemptionWith(['product_reference' => 'STEAK-01', 'payment_amount' => 200]), 201);
         $this->fake->queueData($this->redemptionWith(['discount_value' => 500, 'discount_type' => 'fixed_amount']), 201);
 
         $steak = $this->puntjes()->redemptions->create(new CreateRedemption('CARD-1', rewardId: 2, idempotencyKey: 'steak-1'));
         $discount = $this->puntjes()->redemptions->create(new CreateRedemption('CARD-1', rewardId: 3, idempotencyKey: 'disc-1'));
 
-        self::assertSame(200, $steak->extraAmount());
-        self::assertSame(0, $discount->extraAmount());
+        self::assertSame(200, $steak->paymentAmount());
+        self::assertSame(0, $discount->paymentAmount());
     }
 
     public function test_creating_a_redemption_returns_the_confirmation_code(): void
@@ -602,7 +602,7 @@ final class ResourceTest extends TestCase
         self::assertSame(48, $reward->codeValidForHours);
     }
 
-    public function test_a_reward_from_a_product_sends_and_reads_the_extra_amount_in_cents(): void
+    public function test_a_reward_from_a_product_sends_and_reads_the_payment_amount_in_cents(): void
     {
         $this->fake->queueData([
             'id' => 4, 'product_id' => 6, 'name' => 'Steak', 'description' => null,
@@ -610,24 +610,24 @@ final class ResourceTest extends TestCase
             'total_stock' => null, 'remaining_stock' => 0,
             'status' => ['value' => 'active', 'label' => 'Active'],
             'available_from' => null, 'available_until' => null, 'discount_value' => null,
-            'discount_type' => null, 'product_reference' => 'STEAK-01', 'extra_amount' => 1999,
+            'discount_type' => null, 'product_reference' => 'STEAK-01', 'payment_amount' => 1999,
             'code_valid_for_hours' => null,
             'created_at' => '2026-10-01T10:00:00+00:00', 'updated_at' => '2026-10-01T10:00:00+00:00',
         ], 201);
 
         $reward = $this->puntjes()->products->createReward('STEAK-01', new CreateRewardFromProduct(
             pointCost: 500,
-            extraAmount: 1999,
+            paymentAmount: 1999,
         ));
 
-        self::assertSame(1999, $this->fake->bodyAt(1)['extra_amount']);
-        self::assertSame(1999, $reward->extraAmount);
+        self::assertSame(1999, $this->fake->bodyAt(1)['payment_amount']);
+        self::assertSame(1999, $reward->paymentAmount);
     }
 
-    public function test_a_reward_from_a_product_without_an_extra_amount_sends_none(): void
+    public function test_a_reward_from_a_product_without_an_payment_amount_sends_none(): void
     {
-        self::assertArrayNotHasKey('extra_amount', (new CreateRewardFromProduct(pointCost: 200))->toArray());
-        self::assertSame(0, (new CreateRewardFromProduct(pointCost: 200, extraAmount: 0))->toArray()['extra_amount']);
+        self::assertArrayNotHasKey('payment_amount', (new CreateRewardFromProduct(pointCost: 200))->toArray());
+        self::assertSame(0, (new CreateRewardFromProduct(pointCost: 200, paymentAmount: 0))->toArray()['payment_amount']);
     }
 
     public function test_campaigns_report_the_minimum_spend_in_euros(): void

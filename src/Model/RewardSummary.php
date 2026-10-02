@@ -43,7 +43,7 @@ final class RewardSummary
          *
          * Show it next to the points ("500 points + € 2,00") so the customer knows before they pick.
          */
-        public readonly int $extraAmount = 0,
+        public readonly int $paymentAmount = 0,
     ) {}
 
     /** @param array<array-key, mixed> $data */
@@ -64,7 +64,7 @@ final class RewardSummary
             availableUntil: Cast::nullableString($data, 'available_until'),
             rawType: $rawType,
             branches: Branch::scopeFromArray($data),
-            extraAmount: Cast::int($data, 'extra_amount'),
+            paymentAmount: Cast::int($data, 'payment_amount'),
         );
     }
 
