@@ -118,6 +118,45 @@ final class ShapeChangeTest extends TestCase
     }
 
     /**
+     * The API sends `whole` from the campaign builder and `whole_purchase` from campaigns older than
+     * campaign families, and both mean the whole purchase. An older schedule can store Sunday as 7.
+     * The SDK hands all of it over as it came, so a stricter model cannot start refusing a live row.
+     */
+    public function test_a_campaign_hands_over_either_scope_word_and_a_sunday_seven_as_sent(): void
+    {
+        $this->fake->queuePage([
+            $this->purchaseCampaign(1, ['scope' => 'whole'], ['days' => [6, 7]]),
+            $this->purchaseCampaign(2, ['scope' => 'whole_purchase'], ['days' => [6, 0]]),
+        ]);
+
+        [$builderMade, $older] = $this->puntjes()->campaigns->list()->firstPage()->items;
+
+        self::assertSame(['scope' => 'whole'], $builderMade->config);
+        self::assertSame(['days' => [6, 7]], $builderMade->recurrenceConfig);
+        self::assertSame(['scope' => 'whole_purchase'], $older->config);
+        self::assertSame(['days' => [6, 0]], $older->recurrenceConfig);
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $recurrenceConfig
+     * @return array<string, mixed>
+     */
+    private function purchaseCampaign(int $id, array $config, array $recurrenceConfig): array
+    {
+        return [
+            'id' => $id, 'name' => 'Weekend', 'family' => 'purchase', 'moment' => null,
+            'config' => $config, 'version' => 1,
+            'multiplier' => 2, 'recurrence_type' => 'days_of_week',
+            'recurrence_config' => $recurrenceConfig,
+            'schedule_summary' => 'Elk weekend', 'starts_at' => '2026-08-01', 'ends_at' => null,
+            'status' => ['value' => 'active', 'label' => 'Actief'],
+            'min_transaction_amount' => null,
+            'created_at' => null, 'updated_at' => null,
+        ];
+    }
+
+    /**
      * An API from before `extra_amount` sends no such key. The SDK reads 0, which is what the
      * field means: points only. A reward and a redemption from that API must not read as broken.
      */
