@@ -9,6 +9,13 @@ a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
 ### Added
 
+- **`ErrorCode::InvalidJson`** (`INVALID_JSON`, 400), the answer a write endpoint gives when it
+  cannot read the request body: the JSON is cut off, or it is not valid UTF-8. The API creates,
+  changes and sends nothing. Before, such a body was read as empty, so `register()` could make an
+  empty customer and `sendCard()` could send a card. It stays a plain `ApiException`, and the SDK
+  never replays it, because the same body fails the same way. An empty body, `{}`, `[]` and
+  `null` keep their answers. Older SDK versions already surface the code through
+  `ApiException::code()`; this release names it on the enum and pins the mapping with tests.
 - **`ErrorCode::CustomerEmailSuppressed`** (`CUSTOMER_EMAIL_SUPPRESSED`, 422), the
   answer both send-card operations give when earlier mail to the customer's address
   bounced or was marked as spam. The API refuses before it queues anything, so the
@@ -32,6 +39,12 @@ a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
 ### Changed
 
+- **Text the API cannot read now gets a clear answer, with no SDK code change.** A query value
+  or form field that is not valid UTF-8 answers 422 `VALIDATION_ERROR` and names the field, so
+  it arrives as a `ValidationException`. Before, it answered 500 `INTERNAL_ERROR`. A path with a
+  NUL byte or invalid UTF-8 answers 404 `ROUTE_NOT_FOUND`, so it arrives as a `NotFoundException`.
+  Before, a NUL byte cut the key short, and `delete('SKU-1%00')` deleted `SKU-1`. Tests now pin
+  both mappings.
 - **`Campaign::$config['scope']` can read `whole` or `whole_purchase`, and both mean the whole
   purchase.** The campaign builder stores `whole`; campaigns older than campaign families
   store `whole_purchase`. A `days_of_week` schedule from an older release can also store

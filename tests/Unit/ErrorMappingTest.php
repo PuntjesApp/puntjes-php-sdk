@@ -15,6 +15,8 @@ use Puntjes\Exception\RateLimitException;
 use Puntjes\Exception\ServerException;
 use Puntjes\Exception\TransportException;
 use Puntjes\Exception\ValidationException;
+use Puntjes\Request\ProductFilters;
+use Puntjes\Request\UpsertProduct;
 use Puntjes\Tests\Support\TestCase;
 
 final class ErrorMappingTest extends TestCase
@@ -25,9 +27,11 @@ final class ErrorMappingTest extends TestCase
     public static function statusProvider(): array
     {
         return [
+            '400 unreadable body' => [400, 'INVALID_JSON', ApiException::class],
             '401 unauthenticated' => [401, 'UNAUTHENTICATED', AuthenticationException::class],
             '403 vendor suspended' => [403, 'VENDOR_SUSPENDED', ForbiddenException::class],
             '404 customer' => [404, 'CUSTOMER_NOT_FOUND', NotFoundException::class],
+            '404 unreadable path' => [404, 'ROUTE_NOT_FOUND', NotFoundException::class],
             '409 duplicate identifier' => [409, 'IDENTIFIER_DUPLICATE', ConflictException::class],
             '422 domain refusal' => [422, 'INSUFFICIENT_BALANCE', ApiException::class],
             '422 idempotency conflict' => [422, 'IDEMPOTENCY_KEY_CONFLICT', ApiException::class],
@@ -63,6 +67,66 @@ final class ErrorMappingTest extends TestCase
             self::assertSame($code, $e->code());
             self::assertSame('req_'.$code, $e->requestId());
         }
+    }
+
+    public function test_a_body_the_api_cannot_read_is_a_client_error_and_is_never_replayed(): void
+    {
+        // The JSON was cut off or is not valid UTF-8. The API created and sent nothing,
+        // and the same body can only fail the same way, so the SDK must not try again.
+        // A PUT is a call the SDK normally replays, which makes it the sharp test.
+        $this->fake->queueError(400, 'INVALID_JSON', 'The request body is not valid JSON.');
+
+        try {
+            $this->puntjes()->products->upsert('SKU-1', new UpsertProduct(name: 'Brood'));
+            self::fail('Expected an ApiException.');
+        } catch (ApiException $e) {
+            self::assertSame(ApiException::class, $e::class);
+            self::assertTrue($e->is(ErrorCode::InvalidJson));
+            self::assertSame(ErrorCode::InvalidJson, $e->errorCode());
+            self::assertSame(400, $e->status());
+        }
+
+        self::assertSame(1, $this->fake->apiRequestCount());
+        self::assertSame([], $this->sleeps);
+    }
+
+    public function test_text_the_api_cannot_read_in_a_query_value_is_a_validation_error_naming_the_field(): void
+    {
+        // A lone %FF byte in `search` used to answer 500. It now answers 422 with the
+        // field named, and it lands on the type an integrator already catches.
+        $this->fake->queueError(422, 'VALIDATION_ERROR', 'The given data was invalid.', details: [
+            'search' => ['The search field must be valid UTF-8 text.'],
+        ]);
+
+        try {
+            $this->puntjes()->products->list(new ProductFilters(search: "\xFF"))->firstPage();
+            self::fail('Expected a ValidationException.');
+        } catch (ValidationException $e) {
+            self::assertSame(422, $e->status());
+            self::assertSame(['The search field must be valid UTF-8 text.'], $e->errorsFor('search'));
+        }
+
+        self::assertSame(1, $this->fake->apiRequestCount());
+    }
+
+    public function test_a_path_the_api_cannot_read_is_a_not_found_error(): void
+    {
+        // A NUL byte in a key used to cut the key short and hit the wrong record. The
+        // API now answers 404 ROUTE_NOT_FOUND, so no record is touched.
+        $this->fake->queueError(404, 'ROUTE_NOT_FOUND', 'The route could not be found.');
+
+        try {
+            $this->puntjes()->products->find("SKU-1\0");
+            self::fail('Expected a NotFoundException.');
+        } catch (NotFoundException $e) {
+            self::assertTrue($e->is(ErrorCode::RouteNotFound));
+            self::assertSame(404, $e->status());
+        }
+
+        self::assertSame(
+            '/api/v1/products/SKU-1%00',
+            $this->fake->requestAt(1)->getUri()->getPath(),
+        );
     }
 
     public function test_a_domain_refusal_is_not_a_validation_exception(): void
