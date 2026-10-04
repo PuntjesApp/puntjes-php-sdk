@@ -229,13 +229,28 @@ try {
 | `RateLimitException` | 429 `RATE_LIMITED`, with `retryAfter()` |
 | `PlanLimitExceededException` | 429 `PLAN_LIMIT_EXCEEDED` — upgrade the plan |
 | `ServerException` | 5xx |
-| `ApiException` | Any other API error, including 422 domain refusals |
+| `ApiException` | Any other API error, including 400 `INVALID_JSON` and 422 domain refusals |
 | `TransportException` | No HTTP response at all, or a non-JSON body |
 | `ConfigurationException` | Bad settings — raised before any request |
 
 > `422` covers both validation failures *and* domain refusals like
 > `INSUFFICIENT_BALANCE` or `OUT_OF_STOCK`. Only the former is a `ValidationException`,
 > so catching it never silently swallows a business outcome you needed to handle.
+
+### Unreadable requests
+
+Some requests reach the API in a shape it cannot read. The answer is always an error, and
+the API changes nothing:
+
+| What was sent | Answer | Exception |
+|---|---|---|
+| A JSON body that is cut off, or is not valid UTF-8 | 400 `INVALID_JSON` | `ApiException` |
+| A query value or form field that is not valid UTF-8 | 422 `VALIDATION_ERROR`, with the field named | `ValidationException` |
+| A path with a NUL byte or text that is not valid UTF-8 | 404 `ROUTE_NOT_FOUND` | `NotFoundException` |
+
+Sending the same request again gives the same answer, so the SDK never replays these.
+Fix the text in your own code first. For `INVALID_JSON`, check `$e->is(ErrorCode::InvalidJson)`.
+The SDK writes JSON with `json_encode` and stops on bad UTF-8 before it sends, so you should rarely see this code.
 
 `ErrorCode` is an enum of every documented code. Unknown codes — a newer API than
 your SDK — leave `errorCode()` null while `code()` still returns the raw string, so a

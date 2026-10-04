@@ -20,6 +20,12 @@ enum ErrorCode: string
     case Unauthenticated = 'UNAUTHENTICATED';
     case InvalidClient = 'INVALID_CLIENT';
     case Forbidden = 'FORBIDDEN';
+    /**
+     * The request body could not be read: the JSON is cut off, or it is not valid UTF-8 (400).
+     * The API created, changed and sent nothing. Sending the same body again fails the same
+     * way, so fix the body first. The SDK never replays it.
+     */
+    case InvalidJson = 'INVALID_JSON';
     case RouteNotFound = 'ROUTE_NOT_FOUND';
     case MethodNotAllowed = 'METHOD_NOT_ALLOWED';
     case RateLimited = 'RATE_LIMITED';
