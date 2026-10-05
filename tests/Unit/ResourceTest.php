@@ -685,6 +685,50 @@ final class ResourceTest extends TestCase
         self::assertStringContainsString('top_products_limit=5', $this->fake->uriAt(1));
     }
 
+    public function test_the_loyalty_block_reads_the_points_an_import_brought_along_apart(): void
+    {
+        $this->fake->queueData([
+            'period' => ['preset' => '30d', 'from' => '', 'to' => '', 'timezone' => 'Europe/Brussels', 'granularity' => 'daily'],
+            'commerce' => ['orders' => 0, 'revenue_cents' => 0, 'average_order_value_cents' => 0, 'itemized' => [], 'volume_trend' => []],
+            'loyalty' => [
+                'points_issued' => 600, 'points_redeemed' => 2000, 'points_expired' => 500,
+                'net_adjustments' => 0, 'redemption_rate' => 3.333, 'breakage_rate' => 0.8333,
+                'points_redeemed_from_import' => 1500, 'points_expired_from_import' => 400,
+                'redemption_rate_excluding_import' => 0.833, 'breakage_rate_excluding_import' => 0.1667,
+            ],
+        ]);
+
+        $loyalty = $this->puntjes()->statistics->get(Period::ThirtyDays)->loyalty;
+
+        self::assertNotNull($loyalty);
+        self::assertSame(2000, $loyalty->pointsRedeemed);
+        self::assertSame(3.333, $loyalty->redemptionRate);
+        self::assertSame(1500, $loyalty->pointsRedeemedFromImport);
+        self::assertSame(400, $loyalty->pointsExpiredFromImport);
+        self::assertSame(0.833, $loyalty->redemptionRateExcludingImport);
+        self::assertSame(0.1667, $loyalty->breakageRateExcludingImport);
+    }
+
+    public function test_a_puntjes_that_does_not_send_the_import_fields_yet_reads_as_no_import(): void
+    {
+        $this->fake->queueData([
+            'period' => ['preset' => '30d', 'from' => '', 'to' => '', 'timezone' => 'Europe/Brussels', 'granularity' => 'daily'],
+            'commerce' => ['orders' => 0, 'revenue_cents' => 0, 'average_order_value_cents' => 0, 'itemized' => [], 'volume_trend' => []],
+            'loyalty' => [
+                'points_issued' => 5000, 'points_redeemed' => 1200, 'points_expired' => 300,
+                'net_adjustments' => -50, 'redemption_rate' => 0.24, 'breakage_rate' => 0.06,
+            ],
+        ]);
+
+        $loyalty = $this->puntjes()->statistics->get(Period::ThirtyDays)->loyalty;
+
+        self::assertNotNull($loyalty);
+        self::assertSame(0, $loyalty->pointsRedeemedFromImport);
+        self::assertSame(0, $loyalty->pointsExpiredFromImport);
+        self::assertNull($loyalty->redemptionRateExcludingImport);
+        self::assertNull($loyalty->breakageRateExcludingImport);
+    }
+
     public function test_an_empty_statistics_period_reports_null_rates_not_zero(): void
     {
         $this->fake->queueData([
