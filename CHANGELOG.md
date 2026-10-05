@@ -9,6 +9,17 @@ a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
 ### Added
 
+- **Import-free loyalty rates** on `LoyaltyStatistics`, from `GET /statistics`. After a shop
+  moves its customers over from another loyalty system, the customers bring their old points
+  along. Those points never count as issued, but they do count in `pointsRedeemed` and
+  `pointsExpired` when they are spent or expire, so `redemptionRate` and `breakageRate` can
+  pass 1.0 for up to 90 days. Four new properties keep them apart:
+  - `pointsRedeemedFromImport` and `pointsExpiredFromImport`, the imported part of each total;
+  - `redemptionRateExcludingImport` and `breakageRateExcludingImport`, the rates with the
+    imported points left out of both sides: the rates the Puntjes dashboard shows.
+  Read the new rates first and fall back to the old ones. The old properties keep their values.
+  The new properties come last, with a default, so code that builds the class by position keeps
+  working; a Puntjes that does not send the fields yet reads as `0` and `null`.
 - **`ErrorCode::InvalidJson`** (`INVALID_JSON`, 400), the answer a write endpoint gives when it
   cannot read the request body: the JSON is cut off, or it is not valid UTF-8. The API creates,
   changes and sends nothing. Before, such a body was read as empty, so `register()` could make an

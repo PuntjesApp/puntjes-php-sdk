@@ -172,6 +172,20 @@ $reward->isRedeemableEverywhere();
 $campaign->runsEverywhere();
 ```
 
+### Rates after an import
+
+```php
+$loyalty = $puntjes->statistics->get(Period::ThirtyDays)->loyalty;
+
+$rate = $loyalty?->redemptionRateExcludingImport ?? $loyalty?->redemptionRate;
+```
+
+Points a customer brought along from another loyalty system never count as issued, but they
+do count when they are spent or expire, so `redemptionRate` and `breakageRate` can pass 1.0
+after an import. The `…ExcludingImport` rates leave those points out of both sides, as the
+Puntjes dashboard does. They are null when nothing was issued, and from a Puntjes that does
+not send them yet, so the fallback above covers both.
+
 ### Filtering a report
 
 ```php
