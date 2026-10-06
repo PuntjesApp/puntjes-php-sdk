@@ -11,8 +11,8 @@ a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
 - **`Vouchers::find(string $code): VoucherLookup`**, for `GET /vouchers/{code}`. It reads a
   campaign bon without spending it, so the till can check the bon before it calls `verify()`.
-  `VoucherLookup` has the same fields as `VoucherVerification`, plus a `status`. `consumedAt`
-  is null while the bon is not spent. The status is the new enum `VoucherStatus` (`Valid`,
+  `VoucherLookup` has the same fields as `VoucherVerification`, plus a `status`, and its
+  `consumedAt` is nullable: it is null while the bon is not spent. The status is the new enum `VoucherStatus` (`Valid`,
   `Used` or `Expired`), and `isRedeemable()` is true only for `Valid`. An expired bon answers
   200 with `Expired`, not an error. A status that this SDK does not know reads as null and
   never throws. A code of another vendor, or a code that was never issued, throws

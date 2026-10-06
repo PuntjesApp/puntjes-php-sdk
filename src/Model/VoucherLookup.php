@@ -25,10 +25,6 @@ use Puntjes\Support\Cast;
  */
 final class VoucherLookup
 {
-    public const KIND_DISCOUNT = 'discount';
-
-    public const KIND_FREE_PRODUCT = 'free_product';
-
     /**
      * @param  array<int, VoucherProduct>|null  $products  Null for a discount bon.
      */
@@ -64,6 +60,6 @@ final class VoucherLookup
 
     public function isFreeProduct(): bool
     {
-        return $this->kind === self::KIND_FREE_PRODUCT;
+        return $this->kind === VoucherVerification::KIND_FREE_PRODUCT;
     }
 }

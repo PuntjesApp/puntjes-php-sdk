@@ -21,7 +21,10 @@ use Puntjes\Support\Cast;
  *     if ($result->isFreeProduct()) {
  *         foreach ($result->products as $product) { … }   // hand these over
  *     } else {
- *         $till->discount($result->discount->appliedTo($orderTotal));
+ *         $base = $result->discount->productReference === null
+ *             ? $orderTotal
+ *             : $till->lineTotal($result->discount->productReference);
+ *         $till->discount($result->discount->appliedTo($base));
  *     }
  */
 final class VoucherVerification

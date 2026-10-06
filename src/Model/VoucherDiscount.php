@@ -47,7 +47,10 @@ final class VoucherDiscount
         return $this->kind === self::KIND_PERCENTAGE;
     }
 
-    /** What to take off an order total of $totalCents, in cents. */
+    /**
+     * What to take off $totalCents, in cents: the whole purchase when {@see $productReference} is null,
+     * else the line total of that one product.
+     */
     public function appliedTo(int $totalCents): int
     {
         if ($this->isPercentage()) {

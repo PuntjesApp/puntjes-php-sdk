@@ -77,7 +77,8 @@ final class Vouchers extends Resource
      * @throws NotFoundException `VOUCHER_NOT_FOUND` (404).
      * @throws ApiException `VOUCHER_ALREADY_USED`, `VOUCHER_EXPIRED`,
      *                      `IDEMPOTENCY_KEY_CONFLICT`, `BRANCH_REQUIRED` or
-     *                      `BRANCH_NOT_FOUND` — all 422.
+     *                      `BRANCH_NOT_FOUND`, or `VALIDATION_ERROR` for a key longer than
+     *                      255 characters — all 422.
      */
     public function verify(string $code, ?string $branch = null, ?string $idempotencyKey = null): VoucherVerification
     {
