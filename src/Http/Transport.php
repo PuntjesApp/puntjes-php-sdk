@@ -27,9 +27,10 @@ use Puntjes\Exception\TransportException;
  *     and converges on the same state (`PUT /products/{sku}` is the catalogue-sync
  *     primitive; `DELETE` is a soft delete; `PATCH` sets named fields).
  *   - POST — only when the body carries an `idempotency_key`. That covers
- *     `/transactions`, `/redemptions` and `/customers/{id}/wallet/adjust`, where a
+ *     `/transactions`, `/redemptions`, `/customers/{id}/wallet/adjust` and
+ *     `/vouchers/{code}/verify` when the caller gives a key, where a
  *     unique index plus a savepoint-protected claim make a replay return the original
- *     record instead of moving points twice.
+ *     record instead of moving points twice or spending a bon twice.
  *   - Every other POST — never. `/customers`, `/products`, `/products/batch`,
  *     `/products/{sku}/reward` and `/redemptions/{code}/verify` have no replay
  *     protection, so an auto-retry could duplicate a customer or burn a code.

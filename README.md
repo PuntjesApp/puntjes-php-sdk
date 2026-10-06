@@ -93,7 +93,7 @@ customers, so the SDK is deliberately conservative about what it replays.
 | `POST /customers` | ❌ | A replay would create a second customer |
 | `POST /products`, `/products/batch`, `/products/{sku}/reward` | ❌ | No replay protection |
 | `POST /redemptions/{code}/verify` | ❌ | A replay would answer `CODE_ALREADY_USED` |
-| `POST /vouchers/{code}/verify` | ❌ | Verifying a bon *spends* it; a replay answers `VOUCHER_ALREADY_USED` |
+| `POST /vouchers/{code}/verify` | ❌ unless you pass an idempotency key, then ✅ | Verifying a bon *spends* it. Without a key, a replay answers `VOUCHER_ALREADY_USED`. With `idempotencyKey:`, a replay on the same bon answers the first success again |
 | `POST …/send-card` | ❌ | A replay emails the customer a second time |
 | `POST /customers/link-external-id` | ❌ | No idempotency key — though re-sending the *same* external id is safe if you retry yourself |
 
@@ -118,6 +118,14 @@ new SubmitTransaction(
 Keys are scoped per vendor. Reusing one for a different customer, a different
 `totalAmount` or a different reward returns `IDEMPOTENCY_KEY_CONFLICT` rather than
 someone else's transaction or confirmation code, and nothing is written.
+
+**`vouchers->verify()` is the exception.** The SDK does not make a key for it. It sends
+`idempotency_key` only when you pass `idempotencyKey:`, and only then retries it. Make the
+key from your sale, so a repeat on the same bon answers the first success again. The same
+key on another bon answers `IDEMPOTENCY_KEY_CONFLICT`, and that bon stays unspent. A key
+sent after an earlier spend without a key answers `VOUCHER_ALREADY_USED`. To read a bon
+without spending it, call `$puntjes->vouchers->find($code)`: its `status` is
+`VoucherStatus::Valid`, `Used` or `Expired`, and an expired bon is an answer, not an error.
 
 ## Branches
 
@@ -322,7 +330,9 @@ $puntjes->redemptions->forCustomer(42, RedemptionStatus::Valid);   // rewards st
 $puntjes->redemptions->verify('PNTJ-ABC123');
 
 // Campaign bonnen — the vouchers a campaign gives away. Verifying SPENDS one.
+$puntjes->vouchers->find('BON-ABC12345');                                  // read only: status valid, used or expired
 $puntjes->vouchers->verify('BON-ABC12345');
+$puntjes->vouchers->verify('BON-ABC12345', idempotencyKey: 'sale-'.$sale->id);  // safe to retry
 
 // Products — keyed on YOUR SKU, never on a Puntjes id
 $puntjes->products->list(new ProductFilters(category: 'Bakery'));

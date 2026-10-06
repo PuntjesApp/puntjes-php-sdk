@@ -195,4 +195,23 @@ final class ShapeChangeTest extends TestCase
         self::assertNull($stats->loyalty);
         self::assertSame(168000, $stats->commerce->revenueCents);
     }
+
+    /**
+     * A Puntjes from before Puntjes PR #1073 sends no `product_reference` on a bon product. The SDK
+     * reads null, which is what the field means for a product without an item number.
+     */
+    public function test_a_voucher_product_from_before_the_item_number_reads_null(): void
+    {
+        $this->fake->queueData([
+            'voucher_code' => 'BON-GIFT', 'discount' => null, 'valid_until' => null,
+            'consumed_at' => '2026-08-28T10:00:00+00:00', 'campaign_id' => 7, 'kind' => 'free_product',
+            'products' => [['id' => 3, 'name' => 'Brood', 'quantity' => 1]],
+        ]);
+
+        $products = $this->puntjes()->vouchers->verify('BON-GIFT')->products;
+
+        self::assertNotNull($products);
+        self::assertSame('Brood', $products[0]->name);
+        self::assertNull($products[0]->productReference);
+    }
 }
