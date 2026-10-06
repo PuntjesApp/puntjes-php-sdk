@@ -329,6 +329,34 @@ final class ResourceTest extends TestCase
         self::assertSame(1999, $rewards[0]->paymentAmount);
     }
 
+    public function test_the_reward_catalogue_names_the_product_a_reward_is_about(): void
+    {
+        $item = static fn (int $id, string $type, ?string $reference): array => [
+            'id' => $id, 'name' => 'Reward '.$id, 'description' => null, 'type' => $type,
+            'point_cost' => 100, 'image_url' => null, 'remaining_stock' => 5, 'total_stock' => null,
+            'available_from' => null, 'available_until' => null, 'payment_amount' => 0,
+            'product_reference' => $reference,
+        ];
+        $older = $item(4, 'discount', null);
+        unset($older['product_reference']);
+        $this->fake->queueData([
+            $item(1, 'discount', 'KT-10234'),
+            $item(2, 'discount', null),
+            $item(3, 'free_product', 'STEAK-01'),
+            $older,
+        ]);
+
+        $rewards = $this->puntjes()->rewards->list();
+
+        self::assertSame('KT-10234', $rewards[0]->productReference);
+        self::assertTrue($rewards[0]->isDiscountOnOneProduct());
+        self::assertNull($rewards[1]->productReference);
+        self::assertFalse($rewards[1]->isDiscountOnOneProduct());
+        self::assertSame('STEAK-01', $rewards[2]->productReference);
+        self::assertFalse($rewards[2]->isDiscountOnOneProduct());
+        self::assertNull($rewards[3]->productReference);
+    }
+
     public function test_a_redemption_tells_the_till_the_payment_amount_to_collect(): void
     {
         $this->fake->queueData($this->redemptionWith(['product_reference' => 'STEAK-01', 'payment_amount' => 200]), 201);

@@ -476,6 +476,8 @@ whole purchase, for example "20% off the kernthermometer". The till gets that pr
 item number. With no item number, the discount counts on the whole purchase, as before.
 
 ```php
+$rewards[0]->isDiscountOnOneProduct();           // true: check KT-10234 is on the sale before the claim
+$rewards[0]->productReference;                   // 'KT-10234', straight from GET /rewards
 $redemption->productReference();                 // 'KT-10234', or null for the whole purchase
 $voucher = $puntjes->vouchers->verify('BON-ABC12345');
 $voucher->discount?->isOnOneProduct();           // true
