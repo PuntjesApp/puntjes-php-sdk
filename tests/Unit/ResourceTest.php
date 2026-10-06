@@ -331,6 +331,34 @@ final class ResourceTest extends TestCase
         self::assertSame(1999, $rewards[0]->paymentAmount);
     }
 
+    public function test_the_reward_catalogue_names_the_product_a_reward_is_about(): void
+    {
+        $item = static fn (int $id, string $type, ?string $reference): array => [
+            'id' => $id, 'name' => 'Reward '.$id, 'description' => null, 'type' => $type,
+            'point_cost' => 100, 'image_url' => null, 'remaining_stock' => 5, 'total_stock' => null,
+            'available_from' => null, 'available_until' => null, 'payment_amount' => 0,
+            'product_reference' => $reference,
+        ];
+        $older = $item(4, 'discount', null);
+        unset($older['product_reference']);
+        $this->fake->queueData([
+            $item(1, 'discount', 'KT-10234'),
+            $item(2, 'discount', null),
+            $item(3, 'free_product', 'STEAK-01'),
+            $older,
+        ]);
+
+        $rewards = $this->puntjes()->rewards->list();
+
+        self::assertSame('KT-10234', $rewards[0]->productReference);
+        self::assertTrue($rewards[0]->isDiscountOnOneProduct());
+        self::assertNull($rewards[1]->productReference);
+        self::assertFalse($rewards[1]->isDiscountOnOneProduct());
+        self::assertSame('STEAK-01', $rewards[2]->productReference);
+        self::assertFalse($rewards[2]->isDiscountOnOneProduct());
+        self::assertNull($rewards[3]->productReference);
+    }
+
     public function test_a_redemption_tells_the_till_the_payment_amount_to_collect(): void
     {
         $this->fake->queueData($this->redemptionWith(['product_reference' => 'STEAK-01', 'payment_amount' => 200]), 201);
@@ -341,6 +369,70 @@ final class ResourceTest extends TestCase
 
         self::assertSame(200, $steak->paymentAmount());
         self::assertSame(0, $discount->paymentAmount());
+    }
+
+    public function test_a_discount_redemption_names_the_one_product_it_is_for(): void
+    {
+        $this->fake->queueData($this->redemptionWith(['discount_value' => 20, 'discount_type' => 'percentage', 'product_reference' => 'KT-10234'], 'discount'), 201);
+        $this->fake->queueData($this->redemptionWith(['discount_value' => 500, 'discount_type' => 'fixed_amount', 'product_reference' => null], 'discount'), 201);
+        $this->fake->queueData($this->redemptionWith(['discount_value' => 500, 'discount_type' => 'fixed_amount'], 'discount'), 201);
+
+        $onOneProduct = $this->puntjes()->redemptions->create(new CreateRedemption('CARD-1', rewardId: 4, idempotencyKey: 'kt-1'));
+        $wholePurchase = $this->puntjes()->redemptions->create(new CreateRedemption('CARD-1', rewardId: 3, idempotencyKey: 'disc-2'));
+        $olderPuntjes = $this->puntjes()->redemptions->create(new CreateRedemption('CARD-1', rewardId: 3, idempotencyKey: 'disc-3'));
+
+        self::assertSame('KT-10234', $onOneProduct->productReference());
+        self::assertNull($wholePurchase->productReference());
+        self::assertNull($olderPuntjes->productReference());
+    }
+
+    public function test_a_voucher_discount_names_the_one_product_it_is_for(): void
+    {
+        $this->fake->queueData([
+            'voucher_code' => 'BON-KT',
+            'discount' => ['kind' => 'percentage', 'percentage' => 20, 'product_reference' => 'KT-10234'],
+            'valid_until' => null,
+            'consumed_at' => '2026-10-06T10:00:00+00:00',
+            'campaign_id' => 4,
+            'kind' => 'discount',
+            'products' => null,
+        ]);
+        $this->fake->queueData([
+            'voucher_code' => 'BON-ALL',
+            'discount' => ['kind' => 'fixed', 'amount_cents' => 750, 'product_reference' => null],
+            'valid_until' => null,
+            'consumed_at' => '2026-10-06T10:00:00+00:00',
+            'campaign_id' => 4,
+            'kind' => 'discount',
+            'products' => null,
+        ]);
+
+        $onOneProduct = $this->puntjes()->vouchers->verify('BON-KT');
+        $wholePurchase = $this->puntjes()->vouchers->verify('BON-ALL');
+
+        self::assertSame('KT-10234', $onOneProduct->discount?->productReference);
+        self::assertTrue($onOneProduct->discount?->isOnOneProduct());
+        self::assertSame(300, $onOneProduct->discount?->appliedTo(1500));
+        self::assertNull($wholePurchase->discount?->productReference);
+        self::assertFalse($wholePurchase->discount?->isOnOneProduct());
+    }
+
+    public function test_a_voucher_from_an_older_puntjes_reads_as_a_discount_on_the_whole_purchase(): void
+    {
+        $this->fake->queueData([
+            'voucher_code' => 'BON-OLD',
+            'discount' => ['kind' => 'fixed', 'amount_cents' => 750],
+            'valid_until' => null,
+            'consumed_at' => '2026-10-06T10:00:00+00:00',
+            'campaign_id' => 4,
+            'kind' => 'discount',
+            'products' => null,
+        ]);
+
+        $result = $this->puntjes()->vouchers->verify('BON-OLD');
+
+        self::assertNull($result->discount?->productReference);
+        self::assertFalse($result->discount?->isOnOneProduct());
     }
 
     public function test_creating_a_redemption_returns_the_confirmation_code(): void
@@ -445,11 +537,11 @@ final class ResourceTest extends TestCase
      * @param  array<string, mixed>  $typeSpecificData
      * @return array<string, mixed>
      */
-    private function redemptionWith(array $typeSpecificData): array
+    private function redemptionWith(array $typeSpecificData, string $type = 'free_product'): array
     {
         return [
             'redemption_id' => 12, 'confirmation_code' => 'PNTJ-STEAK001',
-            'reward' => ['name' => 'Steak', 'type' => 'free_product'],
+            'reward' => ['name' => 'Steak', 'type' => $type],
             'points_deducted' => 500, 'remaining_balance' => 0,
             'redeemed_at' => '2026-10-01T10:00:00+00:00', 'expires_at' => null,
             'type_specific_data' => $typeSpecificData,
@@ -951,25 +1043,9 @@ final class ResourceTest extends TestCase
         self::assertFalse($result->isFreeProduct());
         self::assertSame(750, $result->discount?->amountCents);
         self::assertSame(750, $result->discount?->appliedTo(4200));
-        self::assertNull($result->discount?->productReference);
         self::assertNull($result->products);
         self::assertSame(['branch' => 'centrum'], $this->fake->bodyAt(1));
         self::assertSame('/api/v1/vouchers/BON-ABC12345/verify', $this->fake->requestAt(1)->getUri()->getPath());
-    }
-
-    public function test_a_voucher_discount_names_the_product_it_is_for(): void
-    {
-        $this->fake->queueData([
-            'voucher_code' => 'BON-STEAK',
-            'discount' => ['kind' => 'percentage', 'percentage' => 20, 'product_reference' => 'STEAK-01'],
-            'valid_until' => null,
-            'consumed_at' => '2026-08-28T10:00:00+00:00',
-            'campaign_id' => 4,
-            'kind' => 'discount',
-            'products' => null,
-        ]);
-
-        self::assertSame('STEAK-01', $this->puntjes()->vouchers->verify('BON-STEAK')->discount?->productReference);
     }
 
     public function test_a_percentage_voucher_is_applied_to_the_order_total(): void

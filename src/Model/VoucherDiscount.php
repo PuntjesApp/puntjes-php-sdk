@@ -13,6 +13,9 @@ use Puntjes\Support\Cast;
  * an integer 1–100 and a fixed amount is an integer number of CENTS, so a single
  * shared field would eventually be read as the wrong one. Exactly one of
  * {@see $percentage} and {@see $amountCents} is set.
+ *
+ * A discount can count on one product instead of the whole purchase: then
+ * {@see $productReference} holds that product's item number.
  */
 final class VoucherDiscount
 {
@@ -27,7 +30,7 @@ final class VoucherDiscount
         public readonly ?int $percentage,
         /** Cents off, when {@see $kind} is `fixed`. Null otherwise. */
         public readonly ?int $amountCents,
-        /** The item number of the one product the discount is for, or null for the whole purchase. */
+        /** The item number of the one product the discount is for. Null when it counts on the whole purchase. */
         public readonly ?string $productReference = null,
     ) {}
 
@@ -47,9 +50,16 @@ final class VoucherDiscount
         return $this->kind === self::KIND_PERCENTAGE;
     }
 
+    /** True when the discount counts on one product only, the one {@see $productReference} names. */
+    public function isOnOneProduct(): bool
+    {
+        return $this->productReference !== null;
+    }
+
     /**
-     * What to take off $totalCents, in cents: the whole purchase when {@see $productReference} is null,
-     * else the line total of that one product.
+     * What to take off $totalCents, in cents. For a discount on one product, pass the amount it counts on:
+     * that product's price, or its line total if the till applies it to every unit. Puntjes leaves that
+     * choice to the till. A fixed amount never takes off more than the amount it is given.
      */
     public function appliedTo(int $totalCents): int
     {

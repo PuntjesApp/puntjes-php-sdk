@@ -5,36 +5,58 @@ Notable changes to `puntjes/php-sdk`. The format follows
 [semantic versioning](https://semver.org/). From 1.0.0 that promise is the ordinary one:
 a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
-## 1.3.0 — 2026-10-06
+## 1.4.0 — 2026-10-06
 
 ### Added
 
-- **`Vouchers::find(string $code): VoucherLookup`**, for `GET /vouchers/{code}`. It reads a
-  campaign bon without spending it, so the till can check the bon before it calls `verify()`.
-  `VoucherLookup` has the same fields as `VoucherVerification`, plus a `status`, and its
-  `consumedAt` is nullable: it is null while the bon is not spent. The status is the new enum `VoucherStatus` (`Valid`,
-  `Used` or `Expired`), and `isRedeemable()` is true only for `Valid`. An expired bon answers
-  200 with `Expired`, not an error. A status that this SDK does not know reads as null and
-  never throws. A code of another vendor, or a code that was never issued, throws
-  `NotFoundException` (`VOUCHER_NOT_FOUND`, 404). Needs a Puntjes with this route; an older
-  Puntjes answers 404 `ROUTE_NOT_FOUND`, which also arrives as a `NotFoundException`.
+- **The reward catalogue names the product a reward is about** (PuntjesApp/Puntjes#1067).
+  `RewardSummary::$productReference` reads the new `product_reference` of `GET /rewards`, and
+  `RewardSummary::isDiscountOnOneProduct()` says whether the till must find that product on the
+  sale before the claim. Read `type` first: for a discount, null means the whole purchase; for a
+  free product, null means the shop gave no item number. Settle the reward with the redemption's
+  values, not with the list: the shop can change a reward between the two. The new property sits
+  last with a default, and a Puntjes that does not send it reads as null.
+- **`Vouchers::find(string $code): VoucherLookup`**, for `GET /vouchers/{code}`
+  (PuntjesApp/Puntjes#1068). It reads a campaign bon without spending it, so the till can check
+  the bon before it calls `verify()`. `VoucherLookup` has the same fields as
+  `VoucherVerification`, plus a `status`, and its `consumedAt` is nullable: it is null while the
+  bon is not spent. The status is the new enum `VoucherStatus` (`Valid`, `Used` or `Expired`),
+  and `isRedeemable()` is true only for `Valid`. An expired bon answers 200 with `Expired`, not
+  an error. A status that this SDK does not know reads as null and never throws. A code of
+  another vendor, or a code that was never issued, throws `NotFoundException`
+  (`VOUCHER_NOT_FOUND`, 404). Needs a Puntjes with this route; an older Puntjes answers 404
+  `ROUTE_NOT_FOUND`, which also arrives as a `NotFoundException`.
 - **An optional idempotency key on `Vouchers::verify()`**, the third argument
   `?string $idempotencyKey = null`. The SDK sends `idempotency_key` only when you give a key,
-  and it does not make one for you, so a call without a key sends the same body as in 1.2.0
+  and it does not make one for you, so a call without a key sends the same body as before
   and is still never retried. With a key, the SDK retries a failed call automatically, as it
   does for every POST that carries a key, and a repeat with the same key on the same bon
   answers the first success again. The same key on another bon answers
   `IDEMPOTENCY_KEY_CONFLICT` (422), and that bon stays unspent. A key sent after an earlier
   spend without a key answers `VOUCHER_ALREADY_USED`. The key can have up to 255 characters.
-- **`VoucherProduct::$productReference`**, the vendor's item number for each product of a
-  free-product bon, in the answers of `find()` and `verify()`. Puntjes copies it when the bon
-  is issued, so it stays the same when the product changes later. It is null when the product
-  had no item number. The property comes last, with a default, so code that builds the class
-  by position keeps working; a Puntjes that does not send the field yet reads as null.
-- **`VoucherDiscount::$productReference`**, the item number of the one product a discount bon
-  is for, or null for a discount on the whole purchase. Puntjes has sent it on `verify()` since
-  2026-10-05, and `find()` sends it too. The property comes last, with a default; a Puntjes that
-  does not send the field reads as null.
+- **`VoucherProduct::$productReference`** (PuntjesApp/Puntjes#1069), the vendor's item number
+  for each product of a free-product bon, in the answers of `find()` and `verify()`. Puntjes
+  copies it when the bon is issued, so it stays the same when the product changes later. It is
+  null when the product had no item number. The property comes last, with a default, so code
+  that builds the class by position keeps working; a Puntjes that does not send the field yet
+  reads as null.
+
+## 1.3.0 — 2026-10-06
+
+### Added
+
+- **A discount on one product.** Puntjes lets a discount reward, or a campaign discount
+  gift, count on one product instead of the whole purchase (PuntjesApp/Puntjes#978).
+  - `Redemption::productReference()` reads the item number from a redemption: the product a
+    discount comes off, or the product to hand over for a free product. Null for a discount
+    on the whole purchase.
+  - `VoucherDiscount::$productReference` and `VoucherDiscount::isOnOneProduct()` read it from
+    a verified voucher. The new property sits last with a default, so positional
+    construction keeps working, and a Puntjes that does not send it reads as null.
+  - A campaign's verbatim `config` may now hold `gift.discount.product_id`.
+  For a discount on one product, pass `VoucherDiscount::appliedTo()` the amount it counts on:
+  that product's price, or its line total if the till applies it to every unit. Puntjes leaves
+  that choice to the till.
 
 ## 1.2.0 — 2026-10-05
 

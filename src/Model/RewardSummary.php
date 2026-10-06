@@ -44,6 +44,12 @@ final class RewardSummary
          * Show it next to the points ("500 points + € 2,00") so the customer knows before they pick.
          */
         public readonly int $paymentAmount = 0,
+        /**
+         * The item number of the product the reward is about. Read {@see $type} first: for a discount, the one
+         * product it comes off, and null means the whole purchase; for a free product, the product to hand over,
+         * and null means the shop gave no item number. Check it before the claim; settle with the redemption.
+         */
+        public readonly ?string $productReference = null,
     ) {}
 
     /** @param array<array-key, mixed> $data */
@@ -65,7 +71,14 @@ final class RewardSummary
             rawType: $rawType,
             branches: Branch::scopeFromArray($data),
             paymentAmount: Cast::int($data, 'payment_amount'),
+            productReference: Cast::nullableString($data, 'product_reference'),
         );
+    }
+
+    /** Whether this is a discount on one product, so the till must find that product on the sale before the claim. */
+    public function isDiscountOnOneProduct(): bool
+    {
+        return $this->type === RewardType::Discount && $this->productReference !== null;
     }
 
     /** Whether this reward is redeemable at every branch, rather than a named few. */

@@ -471,12 +471,34 @@ and `0` means points only.
 ```php
 $rewards[0]->paymentAmount;       // 200: show it next to the points before the customer picks
 $redemption->paymentAmount();     // 200: collect this at the till; always 0 for a discount
+$redemption->productReference();  // 'STEAK-01': the item number of the product to hand over
 $puntjes->products->createReward('SKU-1', new CreateRewardFromProduct(pointCost: 500, paymentAmount: 200));
 ```
 
 A redemption keeps a copy of what it was worth when it was made. If the vendor changes the
 reward later, `find()`, `forCustomer()` and `verify()` still answer the old amount, so
 collect what the redemption says, not what the catalogue says today.
+
+### A discount can be on one product
+
+A discount reward or a campaign discount gift can count on one product instead of the
+whole purchase, for example "20% off the kernthermometer". The till gets that product's
+item number. With no item number, the discount counts on the whole purchase, as before.
+
+```php
+$rewards[0]->isDiscountOnOneProduct();           // true: check KT-10234 is on the sale before the claim
+$rewards[0]->productReference;                   // 'KT-10234', straight from GET /rewards
+$redemption->productReference();                 // 'KT-10234', or null for the whole purchase
+$voucher = $puntjes->vouchers->verify('BON-ABC12345');
+$voucher->discount?->isOnOneProduct();           // true
+$voucher->discount?->productReference;           // 'KT-10234'
+$voucher->discount?->appliedTo($priceCents);     // the amount the discount counts on, see below
+```
+
+Pass `appliedTo()` the amount the discount counts on: that product's price, or its line total
+if your till applies it to every unit. Puntjes leaves that choice to the till. A fixed amount
+can be more than the product's price; `appliedTo()` never takes off more than you pass. A campaign's `config['gift']['discount']['product_id']` names the
+product of a discount gift, as `GET /products` returns its `id`.
 
 ## Token storage
 
