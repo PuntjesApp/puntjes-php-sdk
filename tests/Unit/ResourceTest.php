@@ -951,9 +951,25 @@ final class ResourceTest extends TestCase
         self::assertFalse($result->isFreeProduct());
         self::assertSame(750, $result->discount?->amountCents);
         self::assertSame(750, $result->discount?->appliedTo(4200));
+        self::assertNull($result->discount?->productReference);
         self::assertNull($result->products);
         self::assertSame(['branch' => 'centrum'], $this->fake->bodyAt(1));
         self::assertSame('/api/v1/vouchers/BON-ABC12345/verify', $this->fake->requestAt(1)->getUri()->getPath());
+    }
+
+    public function test_a_voucher_discount_names_the_product_it_is_for(): void
+    {
+        $this->fake->queueData([
+            'voucher_code' => 'BON-STEAK',
+            'discount' => ['kind' => 'percentage', 'percentage' => 20, 'product_reference' => 'STEAK-01'],
+            'valid_until' => null,
+            'consumed_at' => '2026-08-28T10:00:00+00:00',
+            'campaign_id' => 4,
+            'kind' => 'discount',
+            'products' => null,
+        ]);
+
+        self::assertSame('STEAK-01', $this->puntjes()->vouchers->verify('BON-STEAK')->discount?->productReference);
     }
 
     public function test_a_percentage_voucher_is_applied_to_the_order_total(): void

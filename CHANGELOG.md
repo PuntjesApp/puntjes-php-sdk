@@ -31,6 +31,10 @@ a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
   is issued, so it stays the same when the product changes later. It is null when the product
   had no item number. The property comes last, with a default, so code that builds the class
   by position keeps working; a Puntjes that does not send the field yet reads as null.
+- **`VoucherDiscount::$productReference`**, the item number of the one product a discount bon
+  is for, or null for a discount on the whole purchase. Puntjes has sent it on `verify()` since
+  2026-10-05, and `find()` sends it too. The property comes last, with a default; a Puntjes that
+  does not send the field reads as null.
 
 ## 1.2.0 — 2026-10-05
 

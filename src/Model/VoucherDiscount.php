@@ -27,6 +27,8 @@ final class VoucherDiscount
         public readonly ?int $percentage,
         /** Cents off, when {@see $kind} is `fixed`. Null otherwise. */
         public readonly ?int $amountCents,
+        /** The item number of the one product the discount is for, or null for the whole purchase. */
+        public readonly ?string $productReference = null,
     ) {}
 
     /** @param array<array-key, mixed> $data */
@@ -36,6 +38,7 @@ final class VoucherDiscount
             kind: Cast::string($data, 'kind'),
             percentage: Cast::nullableInt($data, 'percentage'),
             amountCents: Cast::nullableInt($data, 'amount_cents'),
+            productReference: Cast::nullableString($data, 'product_reference'),
         );
     }
 
