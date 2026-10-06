@@ -5,6 +5,23 @@ Notable changes to `puntjes/php-sdk`. The format follows
 [semantic versioning](https://semver.org/). From 1.0.0 that promise is the ordinary one:
 a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
+## Unreleased
+
+### Added
+
+- **A discount on one product.** Puntjes lets a discount reward, or a campaign discount
+  gift, count on one product instead of the whole purchase (PuntjesApp/Puntjes#978).
+  - `Redemption::productReference()` reads the item number from a redemption: the product a
+    discount comes off, or the product to hand over for a free product. Null for a discount
+    on the whole purchase.
+  - `VoucherDiscount::$productReference` and `VoucherDiscount::isOnOneProduct()` read it from
+    a verified voucher. The new property sits last with a default, so positional
+    construction keeps working, and a Puntjes that does not send it reads as null.
+  - A campaign's verbatim `config` may now hold `gift.discount.product_id`.
+  For a discount on one product, pass `VoucherDiscount::appliedTo()` the amount it counts on:
+  that product's price, or its line total if the till applies it to every unit. Puntjes leaves
+  that choice to the till.
+
 ## 1.2.0 — 2026-10-05
 
 ### Added

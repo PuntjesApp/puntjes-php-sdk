@@ -341,6 +341,70 @@ final class ResourceTest extends TestCase
         self::assertSame(0, $discount->paymentAmount());
     }
 
+    public function test_a_discount_redemption_names_the_one_product_it_is_for(): void
+    {
+        $this->fake->queueData($this->redemptionWith(['discount_value' => 20, 'discount_type' => 'percentage', 'product_reference' => 'KT-10234'], 'discount'), 201);
+        $this->fake->queueData($this->redemptionWith(['discount_value' => 500, 'discount_type' => 'fixed_amount', 'product_reference' => null], 'discount'), 201);
+        $this->fake->queueData($this->redemptionWith(['discount_value' => 500, 'discount_type' => 'fixed_amount'], 'discount'), 201);
+
+        $onOneProduct = $this->puntjes()->redemptions->create(new CreateRedemption('CARD-1', rewardId: 4, idempotencyKey: 'kt-1'));
+        $wholePurchase = $this->puntjes()->redemptions->create(new CreateRedemption('CARD-1', rewardId: 3, idempotencyKey: 'disc-2'));
+        $olderPuntjes = $this->puntjes()->redemptions->create(new CreateRedemption('CARD-1', rewardId: 3, idempotencyKey: 'disc-3'));
+
+        self::assertSame('KT-10234', $onOneProduct->productReference());
+        self::assertNull($wholePurchase->productReference());
+        self::assertNull($olderPuntjes->productReference());
+    }
+
+    public function test_a_voucher_discount_names_the_one_product_it_is_for(): void
+    {
+        $this->fake->queueData([
+            'voucher_code' => 'BON-KT',
+            'discount' => ['kind' => 'percentage', 'percentage' => 20, 'product_reference' => 'KT-10234'],
+            'valid_until' => null,
+            'consumed_at' => '2026-10-06T10:00:00+00:00',
+            'campaign_id' => 4,
+            'kind' => 'discount',
+            'products' => null,
+        ]);
+        $this->fake->queueData([
+            'voucher_code' => 'BON-ALL',
+            'discount' => ['kind' => 'fixed', 'amount_cents' => 750, 'product_reference' => null],
+            'valid_until' => null,
+            'consumed_at' => '2026-10-06T10:00:00+00:00',
+            'campaign_id' => 4,
+            'kind' => 'discount',
+            'products' => null,
+        ]);
+
+        $onOneProduct = $this->puntjes()->vouchers->verify('BON-KT');
+        $wholePurchase = $this->puntjes()->vouchers->verify('BON-ALL');
+
+        self::assertSame('KT-10234', $onOneProduct->discount?->productReference);
+        self::assertTrue($onOneProduct->discount?->isOnOneProduct());
+        self::assertSame(300, $onOneProduct->discount?->appliedTo(1500));
+        self::assertNull($wholePurchase->discount?->productReference);
+        self::assertFalse($wholePurchase->discount?->isOnOneProduct());
+    }
+
+    public function test_a_voucher_from_an_older_puntjes_reads_as_a_discount_on_the_whole_purchase(): void
+    {
+        $this->fake->queueData([
+            'voucher_code' => 'BON-OLD',
+            'discount' => ['kind' => 'fixed', 'amount_cents' => 750],
+            'valid_until' => null,
+            'consumed_at' => '2026-10-06T10:00:00+00:00',
+            'campaign_id' => 4,
+            'kind' => 'discount',
+            'products' => null,
+        ]);
+
+        $result = $this->puntjes()->vouchers->verify('BON-OLD');
+
+        self::assertNull($result->discount?->productReference);
+        self::assertFalse($result->discount?->isOnOneProduct());
+    }
+
     public function test_creating_a_redemption_returns_the_confirmation_code(): void
     {
         $this->fake->queueData([
@@ -443,11 +507,11 @@ final class ResourceTest extends TestCase
      * @param  array<string, mixed>  $typeSpecificData
      * @return array<string, mixed>
      */
-    private function redemptionWith(array $typeSpecificData): array
+    private function redemptionWith(array $typeSpecificData, string $type = 'free_product'): array
     {
         return [
             'redemption_id' => 12, 'confirmation_code' => 'PNTJ-STEAK001',
-            'reward' => ['name' => 'Steak', 'type' => 'free_product'],
+            'reward' => ['name' => 'Steak', 'type' => $type],
             'points_deducted' => 500, 'remaining_balance' => 0,
             'redeemed_at' => '2026-10-01T10:00:00+00:00', 'expires_at' => null,
             'type_specific_data' => $typeSpecificData,
