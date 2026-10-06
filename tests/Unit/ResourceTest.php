@@ -494,7 +494,7 @@ final class ResourceTest extends TestCase
         self::assertSame(1, $this->fake->apiRequestCount());
     }
 
-    public function test_a_cancelled_redemption_reads_as_cancelled_and_cannot_be_redeemed(): void
+    public function test_a_cancelled_redemption_reads_as_cancelled(): void
     {
         $this->fake->queueData([
             'redemption_id' => 11,
@@ -512,7 +512,29 @@ final class ResourceTest extends TestCase
         $redemption = $this->puntjes()->redemptions->find('PNT-ABC123');
 
         self::assertSame(RedemptionStatus::Cancelled, $redemption->status);
+        self::assertFalse($redemption->status->isRedeemable());
         self::assertFalse($redemption->isVerified());
+    }
+
+    public function test_a_redemption_cancelled_after_the_till_verified_it_stays_verified(): void
+    {
+        $this->fake->queueData([
+            'redemption_id' => 11,
+            'confirmation_code' => 'PNT-ABC123',
+            'status' => 'cancelled',
+            'reward' => ['name' => 'Gratis koffie', 'type' => 'free_product'],
+            'customer' => ['name' => 'Jan Everaert'],
+            'points_deducted' => 100,
+            'redeemed_at' => '2026-09-30T10:00:00+00:00',
+            'verified_at' => '2026-09-30T11:00:00+00:00',
+            'expires_at' => null,
+            'type_specific_data' => [],
+        ]);
+
+        $redemption = $this->puntjes()->redemptions->find('PNT-ABC123');
+
+        self::assertSame(RedemptionStatus::Cancelled, $redemption->status);
+        self::assertTrue($redemption->isVerified());
     }
 
     public function test_only_a_valid_redemption_is_redeemable(): void

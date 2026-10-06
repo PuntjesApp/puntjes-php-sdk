@@ -10,7 +10,11 @@ enum RedemptionStatus: string
     case Valid = 'valid';
     case Used = 'used';
     case Expired = 'expired';
-    /** The shop cancelled the redemption in the admin portal and the customer got the points back. */
+    /**
+     * The shop cancelled the redemption in the admin portal and the customer got the points back.
+     * The shop can also cancel a code after the till verified it. That redemption keeps its verifiedAt,
+     * so Redemption::isVerified() stays true. Read the status first.
+     */
     case Cancelled = 'cancelled';
 
     /** True when the code can still be handed in. Only a valid code can: a cancelled code is final. */

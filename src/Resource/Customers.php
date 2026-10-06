@@ -73,7 +73,8 @@ final class Customers extends Resource
      *
      * A duplicate loyalty identifier or external id is a 409
      * ({@see ConflictException}). So is an email address that another customer of
-     * the same vendor already has (`IDENTIFIER_DUPLICATE`) — for a POS enrolment flow, check
+     * the same vendor already has, as profile email or as email identifier, a deactivated
+     * customer included (`IDENTIFIER_DUPLICATE`) — for a POS enrolment flow, check
      * with {@see findByIdentifier()} first.
      */
     public function register(CreateCustomer $customer): Customer
@@ -100,7 +101,8 @@ final class Customers extends Resource
      * @throws NotFoundException (`EXTERNAL_ID_NOT_FOUND`) when the external id is unknown.
      *                           Nothing is created implicitly.
      * @throws ConflictException `IDENTIFIER_DUPLICATE` (409) when another customer of the
-     *                           same vendor already has the new email address.
+     *                           same vendor already has the new email address, as profile
+     *                           email or as email identifier, a deactivated customer included.
      */
     public function updateByExternalId(string $externalId, UpdateCustomer $changes): Customer
     {
