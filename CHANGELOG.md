@@ -5,7 +5,19 @@ Notable changes to `puntjes/php-sdk`. The format follows
 [semantic versioning](https://semver.org/). From 1.0.0 that promise is the ordinary one:
 a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
-## Unreleased
+## 1.4.0 — 2026-10-06
+
+### Added
+
+- **The reward catalogue names the product a reward is about** (PuntjesApp/Puntjes#1067).
+  `RewardSummary::$productReference` reads the new `product_reference` of `GET /rewards`, and
+  `RewardSummary::isDiscountOnOneProduct()` says whether the till must find that product on the
+  sale before the claim. Read `type` first: for a discount, null means the whole purchase; for a
+  free product, null means the shop gave no item number. Settle the reward with the redemption's
+  values, not with the list: the shop can change a reward between the two. The new property sits
+  last with a default, and a Puntjes that does not send it reads as null.
+
+## 1.3.0 — 2026-10-06
 
 ### Added
 
