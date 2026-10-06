@@ -20,6 +20,8 @@ use Puntjes\Support\Cast;
  *
  *     if ($result->isFreeProduct()) {
  *         foreach ($result->products as $product) { … }   // hand these over
+ *     } elseif ($result->discount->isOnOneProduct()) {
+ *         $till->discount($result->discount->appliedTo($priceOf($result->discount->productReference)));
  *     } else {
  *         $till->discount($result->discount->appliedTo($orderTotal));
  *     }

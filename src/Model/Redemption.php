@@ -32,7 +32,7 @@ use Puntjes\Support\Cast;
 final class Redemption
 {
     /**
-     * @param  array<string, mixed>  $typeSpecificData  `discount_value` and `discount_type` for a discount;
+     * @param  array<string, mixed>  $typeSpecificData  `discount_value`, `discount_type` and `product_reference` for a discount;
      *                                                  `product_reference` and `payment_amount` for a free product.
      */
     public function __construct(
@@ -84,6 +84,16 @@ final class Redemption
         $amount = $this->typeSpecificData['payment_amount'] ?? 0;
 
         return is_int($amount) ? $amount : 0;
+    }
+
+    /**
+     * The item number of the product this redemption is for: the product to hand over for a free product,
+     * or the one product a discount comes off. Null for a discount on the whole purchase, and for a
+     * redemption from a Puntjes that does not send it yet.
+     */
+    public function productReference(): ?string
+    {
+        return Cast::nullableString($this->typeSpecificData, 'product_reference');
     }
 
     /**
