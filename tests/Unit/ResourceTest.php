@@ -479,6 +479,50 @@ final class ResourceTest extends TestCase
         self::assertStringEndsWith('/redemptions/PNT-ABC123/verify', $this->fake->uriAt(1));
     }
 
+    public function test_verifying_a_cancelled_redemption_is_refused_and_never_retried(): void
+    {
+        $this->fake->queueError(422, 'CODE_CANCELLED', 'The shop cancelled this redemption.');
+
+        try {
+            $this->puntjes()->redemptions->verify('PNT-ABC123');
+            self::fail('Expected the cancelled code to be refused.');
+        } catch (ApiException $e) {
+            self::assertSame(ErrorCode::CodeCancelled, $e->errorCode());
+            self::assertSame(422, $e->status());
+        }
+
+        self::assertSame(1, $this->fake->apiRequestCount());
+    }
+
+    public function test_a_cancelled_redemption_reads_as_cancelled_and_cannot_be_redeemed(): void
+    {
+        $this->fake->queueData([
+            'redemption_id' => 11,
+            'confirmation_code' => 'PNT-ABC123',
+            'status' => 'cancelled',
+            'reward' => ['name' => 'Gratis koffie', 'type' => 'free_product'],
+            'customer' => ['name' => 'Jan Everaert'],
+            'points_deducted' => 100,
+            'redeemed_at' => '2026-09-30T10:00:00+00:00',
+            'verified_at' => null,
+            'expires_at' => null,
+            'type_specific_data' => [],
+        ]);
+
+        $redemption = $this->puntjes()->redemptions->find('PNT-ABC123');
+
+        self::assertSame(RedemptionStatus::Cancelled, $redemption->status);
+        self::assertFalse($redemption->isVerified());
+    }
+
+    public function test_only_a_valid_redemption_is_redeemable(): void
+    {
+        self::assertTrue(RedemptionStatus::Valid->isRedeemable());
+        self::assertFalse(RedemptionStatus::Used->isRedeemable());
+        self::assertFalse(RedemptionStatus::Expired->isRedeemable());
+        self::assertFalse(RedemptionStatus::Cancelled->isRedeemable());
+    }
+
     public function test_a_confirmation_code_is_url_encoded_into_the_path(): void
     {
         $this->fake->queueData([

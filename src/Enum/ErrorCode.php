@@ -82,6 +82,8 @@ enum ErrorCode: string
     case RedemptionNotFound = 'REDEMPTION_NOT_FOUND';
     case CodeAlreadyUsed = 'CODE_ALREADY_USED';
     case CodeExpired = 'CODE_EXPIRED';
+    /** The shop cancelled this redemption and the customer got the points back (422). */
+    case CodeCancelled = 'CODE_CANCELLED';
     case VerificationFailed = 'VERIFICATION_FAILED';
     case IdempotencyKeyConflict = 'IDEMPOTENCY_KEY_CONFLICT';
 

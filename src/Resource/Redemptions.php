@@ -89,7 +89,10 @@ final class Redemptions extends Resource
      * automatic replay of a request whose response was merely lost would look like a
      * failure. Handle that code as "already collected" if you retry yourself.
      *
-     * @throws ApiException `CODE_ALREADY_USED` or `CODE_EXPIRED` (422).
+     * A cancelled code answers `CODE_CANCELLED`: the shop cancelled the redemption in the admin
+     * portal and the customer got the points back, so the till must not hand over the reward.
+     *
+     * @throws ApiException `CODE_ALREADY_USED`, `CODE_EXPIRED` or `CODE_CANCELLED` (422).
      * @throws NotFoundException `REDEMPTION_NOT_FOUND`.
      */
     public function verify(string $confirmationCode): Redemption
