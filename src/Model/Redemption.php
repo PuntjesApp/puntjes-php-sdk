@@ -72,7 +72,10 @@ final class Redemption
         );
     }
 
-    /** True once the code has been handed in and marked used. */
+    /**
+     * True once the code has been handed in. The shop can also cancel a code after the till verified it.
+     * That redemption keeps its verifiedAt, so this stays true. Read status first.
+     */
     public function isVerified(): bool
     {
         return $this->verifiedAt !== null || $this->status === RedemptionStatus::Used;

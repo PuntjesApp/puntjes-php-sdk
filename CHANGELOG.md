@@ -40,6 +40,26 @@ a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
   null when the product had no item number. The property comes last, with a default, so code
   that builds the class by position keeps working; a Puntjes that does not send the field yet
   reads as null.
+- **`ErrorCode::CodeCancelled`** (`CODE_CANCELLED`, 422) (PuntjesApp/Puntjes#899). A shop can now
+  cancel a redemption in the admin portal, and the customer gets the points back.
+  `Redemptions::verify()` on a cancelled code answers this error, so the till must not hand over
+  the reward. The SDK never retries `verify()`, so one call gives one answer.
+- **`RedemptionStatus::Cancelled`** (`cancelled`) (PuntjesApp/Puntjes#899). `find()`,
+  `forCustomer()` and `verify()` can now read this status. It is final, and
+  `isRedeemable()` is false for it, as for `Used` and `Expired`. Filter with
+  `forCustomer($id, RedemptionStatus::Cancelled)` to list the cancelled ones. Puntjes sends no
+  new field for a cancelled redemption. The shop can also cancel a code after the till verified
+  it. That redemption keeps its verifiedAt, so `isVerified()` stays true. Read status first. A
+  replay of `create()` with the same key returns the original redemption also when the shop
+  cancelled it later, and that answer has no status. Call `find()` to read the current status.
+
+### Changed
+
+- **The docs of a duplicate email address** (PuntjesApp/Puntjes#900). `Customers::register()`
+  and `Customers::updateByExternalId()` throw `ConflictException` with `IDENTIFIER_DUPLICATE`
+  (409) when another customer of the same vendor already has that email address, as profile
+  email or as email identifier, a deactivated customer included. The code and the exception are
+  not new. Only the docs of both methods changed.
 
 ## 1.3.0 — 2026-10-06
 

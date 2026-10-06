@@ -25,7 +25,9 @@ final class Redemptions extends Resource
      * Redeem a reward, deducting the points and issuing a confirmation code. Responds 201.
      *
      * Safe to retry: replaying the idempotency key returns the original redemption
-     * without deducting again. Reusing a key for a DIFFERENT customer or reward is
+     * without deducting again. A replay returns the original redemption also when the shop
+     * cancelled it later, and that answer has no status: call `find()` to read the current
+     * status. Reusing a key for a DIFFERENT customer or reward is
      * rejected with `IDEMPOTENCY_KEY_CONFLICT` rather than returning the unrelated
      * redemption that key belongs to.
      *
@@ -48,8 +50,8 @@ final class Redemptions extends Resource
      * Look a confirmation code up without consuming it — the "what is this code
      * worth?" call for a member of staff.
      *
-     * A code past its expiry is transitioned to `expired` as a side effect of being
-     * read, so the status returned is always current.
+     * A `valid` code past its expiry is changed to `expired` as a side effect of being
+     * read, so the status returned is always current. A used or cancelled code keeps its status.
      */
     public function find(string $confirmationCode): Redemption
     {
@@ -64,8 +66,8 @@ final class Redemptions extends Resource
      *
      * Pass `RedemptionStatus::Valid` for the rewards still to collect, then `verify()`
      * the one the customer picks. Each status is the one the code has at the moment
-     * of the request, so a code past its expiry reads `expired` and is left out of
-     * `Valid` even before anyone looked it up. The list only reads; it never writes.
+     * of the request, so a `valid` code past its expiry reads `expired` and is left out of
+     * `Valid` even before anyone looked it up. A used or cancelled code keeps its status. The list only reads; it never writes.
      *
      * @return Paginator<Redemption>
      *
@@ -89,7 +91,10 @@ final class Redemptions extends Resource
      * automatic replay of a request whose response was merely lost would look like a
      * failure. Handle that code as "already collected" if you retry yourself.
      *
-     * @throws ApiException `CODE_ALREADY_USED` or `CODE_EXPIRED` (422).
+     * A cancelled code answers `CODE_CANCELLED`: the shop cancelled the redemption in the admin
+     * portal and the customer got the points back, so the till must not hand over the reward.
+     *
+     * @throws ApiException `CODE_ALREADY_USED`, `CODE_EXPIRED` or `CODE_CANCELLED` (422).
      * @throws NotFoundException `REDEMPTION_NOT_FOUND`.
      */
     public function verify(string $confirmationCode): Redemption
