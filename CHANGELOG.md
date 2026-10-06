@@ -5,6 +5,33 @@ Notable changes to `puntjes/php-sdk`. The format follows
 [semantic versioning](https://semver.org/). From 1.0.0 that promise is the ordinary one:
 a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
+## 1.3.0 — 2026-10-06
+
+### Added
+
+- **`Vouchers::find(string $code): VoucherLookup`**, for `GET /vouchers/{code}`. It reads a
+  campaign bon without spending it, so the till can check the bon before it calls `verify()`.
+  `VoucherLookup` has the same fields as `VoucherVerification`, plus a `status`. `consumedAt`
+  is null while the bon is not spent. The status is the new enum `VoucherStatus` (`Valid`,
+  `Used` or `Expired`), and `isRedeemable()` is true only for `Valid`. An expired bon answers
+  200 with `Expired`, not an error. A status that this SDK does not know reads as null and
+  never throws. A code of another vendor, or a code that was never issued, throws
+  `NotFoundException` (`VOUCHER_NOT_FOUND`, 404). Needs a Puntjes with this route; an older
+  Puntjes answers 404 `ROUTE_NOT_FOUND`, which also arrives as a `NotFoundException`.
+- **An optional idempotency key on `Vouchers::verify()`**, the third argument
+  `?string $idempotencyKey = null`. The SDK sends `idempotency_key` only when you give a key,
+  and it does not make one for you, so a call without a key sends the same body as in 1.2.0
+  and is still never retried. With a key, the SDK retries a failed call automatically, as it
+  does for every POST that carries a key, and a repeat with the same key on the same bon
+  answers the first success again. The same key on another bon answers
+  `IDEMPOTENCY_KEY_CONFLICT` (422), and that bon stays unspent. A key sent after an earlier
+  spend without a key answers `VOUCHER_ALREADY_USED`. The key can have up to 255 characters.
+- **`VoucherProduct::$productReference`**, the vendor's item number for each product of a
+  free-product bon, in the answers of `find()` and `verify()`. Puntjes copies it when the bon
+  is issued, so it stays the same when the product changes later. It is null when the product
+  had no item number. The property comes last, with a default, so code that builds the class
+  by position keeps working; a Puntjes that does not send the field yet reads as null.
+
 ## 1.2.0 — 2026-10-05
 
 ### Added

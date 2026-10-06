@@ -11,7 +11,9 @@ use Puntjes\Support\Cast;
  *
  * A snapshot taken when the bon was minted, so it still names what was promised even
  * after the vendor renames or removes the product. {@see $id} is null exactly when
- * the product has since been deleted.
+ * the product has since been deleted. {@see $productReference} is the vendor's item
+ * number, copied when the bon was issued. It is null when the product had none, or when
+ * an older Puntjes does not send it.
  */
 final class VoucherProduct
 {
@@ -19,6 +21,7 @@ final class VoucherProduct
         public readonly ?int $id,
         public readonly string $name,
         public readonly int $quantity,
+        public readonly ?string $productReference = null,
     ) {}
 
     /** @param array<array-key, mixed> $data */
@@ -28,6 +31,7 @@ final class VoucherProduct
             id: Cast::nullableInt($data, 'id'),
             name: Cast::string($data, 'name'),
             quantity: Cast::int($data, 'quantity'),
+            productReference: Cast::nullableString($data, 'product_reference'),
         );
     }
 }

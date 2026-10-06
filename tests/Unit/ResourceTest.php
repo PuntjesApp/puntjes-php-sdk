@@ -12,9 +12,11 @@ use Puntjes\Enum\Period;
 use Puntjes\Enum\ProductStatus;
 use Puntjes\Enum\RedemptionStatus;
 use Puntjes\Enum\RewardType;
+use Puntjes\Enum\VoucherStatus;
 use Puntjes\Exception\ApiException;
 use Puntjes\Exception\ConfigurationException;
 use Puntjes\Exception\ConflictException;
+use Puntjes\Exception\NotFoundException;
 use Puntjes\Exception\ServerException;
 use Puntjes\Exception\TransportException;
 use Puntjes\Request\AdjustWallet;
@@ -1013,5 +1015,163 @@ final class ResourceTest extends TestCase
         }
 
         self::assertSame(1, $this->fake->apiRequestCount());
+    }
+
+    public function test_a_verify_without_a_key_sends_no_key_and_is_never_retried(): void
+    {
+        $this->fake->queueError(503, 'SERVICE_UNAVAILABLE', 'Try again later.');
+
+        try {
+            $this->puntjes()->vouchers->verify('BON-ABC12345', branch: 'centrum');
+            self::fail('Expected the 503 to surface.');
+        } catch (ServerException) {
+            // expected
+        }
+
+        self::assertSame(['branch' => 'centrum'], $this->fake->bodyAt(1));
+        self::assertSame(1, $this->fake->apiRequestCount());
+    }
+
+    public function test_a_verify_with_a_key_sends_the_key_and_is_retried(): void
+    {
+        $this->fake->queueError(503, 'SERVICE_UNAVAILABLE', 'Try again later.');
+        $this->fake->queueData($this->spentVoucher());
+
+        $result = $this->puntjes()->vouchers->verify('BON-ABC12345', idempotencyKey: 'sale-77');
+
+        self::assertSame('BON-ABC12345', $result->voucherCode);
+        self::assertSame(['idempotency_key' => 'sale-77'], $this->fake->bodyAt(1));
+        self::assertSame(['idempotency_key' => 'sale-77'], $this->fake->bodyAt(2));
+        self::assertSame(2, $this->fake->apiRequestCount());
+    }
+
+    public function test_the_same_key_on_another_voucher_is_a_conflict(): void
+    {
+        $this->fake->queueError(422, 'IDEMPOTENCY_KEY_CONFLICT', 'This key was used for another voucher.');
+
+        try {
+            $this->puntjes()->vouchers->verify('BON-OTHER', idempotencyKey: 'sale-77');
+            self::fail('Expected the key conflict to surface.');
+        } catch (ApiException $e) {
+            self::assertSame(ErrorCode::IdempotencyKeyConflict, $e->errorCode());
+        }
+
+        self::assertSame(1, $this->fake->apiRequestCount());
+    }
+
+    public function test_finding_a_valid_voucher_reads_it_without_spending_it(): void
+    {
+        $this->fake->queueData($this->lookedUpVoucher('valid', consumedAt: null));
+
+        $voucher = $this->puntjes()->vouchers->find('BON-ABC12345');
+
+        self::assertSame('GET', $this->fake->requestAt(1)->getMethod());
+        self::assertSame('/api/v1/vouchers/BON-ABC12345', $this->fake->requestAt(1)->getUri()->getPath());
+        self::assertSame(VoucherStatus::Valid, $voucher->status);
+        self::assertTrue($voucher->status?->isRedeemable());
+        self::assertNull($voucher->consumedAt);
+        self::assertSame('BON-ABC12345', $voucher->voucherCode);
+        self::assertSame(750, $voucher->discount?->amountCents);
+        self::assertSame('2026-12-31', $voucher->validUntil);
+        self::assertSame(4, $voucher->campaignId);
+        self::assertSame('discount', $voucher->kind);
+        self::assertFalse($voucher->isFreeProduct());
+    }
+
+    public function test_finding_a_used_voucher_reports_when_it_was_spent(): void
+    {
+        $this->fake->queueData($this->lookedUpVoucher('used', consumedAt: '2026-10-01T09:30:00+00:00'));
+
+        $voucher = $this->puntjes()->vouchers->find('BON-ABC12345');
+
+        self::assertSame(VoucherStatus::Used, $voucher->status);
+        self::assertFalse($voucher->status?->isRedeemable());
+        self::assertSame('2026-10-01T09:30:00+00:00', $voucher->consumedAt);
+    }
+
+    public function test_finding_an_expired_voucher_answers_instead_of_throwing(): void
+    {
+        $this->fake->queueData($this->lookedUpVoucher('expired', consumedAt: null));
+
+        $voucher = $this->puntjes()->vouchers->find('BON-ABC12345');
+
+        self::assertSame(VoucherStatus::Expired, $voucher->status);
+        self::assertFalse($voucher->status?->isRedeemable());
+    }
+
+    public function test_an_unknown_voucher_status_reads_as_null(): void
+    {
+        $this->fake->queueData($this->lookedUpVoucher('frozen', consumedAt: null));
+
+        $voucher = $this->puntjes()->vouchers->find('BON-ABC12345');
+
+        self::assertNull($voucher->status);
+        self::assertSame('BON-ABC12345', $voucher->voucherCode);
+    }
+
+    public function test_finding_an_unknown_voucher_throws_not_found(): void
+    {
+        $this->fake->queueError(404, 'VOUCHER_NOT_FOUND', 'No voucher found for this code.');
+
+        try {
+            $this->puntjes()->vouchers->find('BON-NOPE');
+            self::fail('Expected the unknown code to be refused.');
+        } catch (NotFoundException $e) {
+            self::assertSame(ErrorCode::VoucherNotFound, $e->errorCode());
+        }
+    }
+
+    public function test_a_voucher_product_carries_its_item_number_when_sent(): void
+    {
+        $this->fake->queueData($this->lookedUpVoucher('valid', consumedAt: null, kind: 'free_product'));
+        $this->fake->queueData($this->spentVoucher(kind: 'free_product'));
+
+        $found = $this->puntjes()->vouchers->find('BON-GIFT');
+        $spent = $this->puntjes()->vouchers->verify('BON-GIFT');
+
+        self::assertTrue($found->isFreeProduct());
+        self::assertNull($found->discount);
+        self::assertNotNull($found->products);
+        self::assertNotNull($spent->products);
+        self::assertSame('SKU-BROOD', $found->products[0]->productReference);
+        self::assertSame('Koffie (verwijderd)', $found->products[1]->name);
+        self::assertNull($found->products[1]->productReference);
+        self::assertSame('SKU-BROOD', $spent->products[0]->productReference);
+    }
+
+    /** @return array<string, mixed> */
+    private function spentVoucher(string $kind = 'discount'): array
+    {
+        return [
+            'voucher_code' => 'BON-ABC12345',
+            'consumed_at' => '2026-10-06T10:00:00+00:00',
+        ] + $this->voucherBody($kind);
+    }
+
+    /** @return array<string, mixed> */
+    private function lookedUpVoucher(string $status, ?string $consumedAt, string $kind = 'discount'): array
+    {
+        return [
+            'voucher_code' => 'BON-ABC12345',
+            'consumed_at' => $consumedAt,
+            'status' => $status,
+        ] + $this->voucherBody($kind);
+    }
+
+    /** @return array<string, mixed> */
+    private function voucherBody(string $kind): array
+    {
+        $freeProduct = $kind === 'free_product';
+
+        return [
+            'discount' => $freeProduct ? null : ['kind' => 'fixed', 'amount_cents' => 750, 'product_reference' => null],
+            'valid_until' => '2026-12-31',
+            'campaign_id' => 4,
+            'kind' => $kind,
+            'products' => $freeProduct ? [
+                ['id' => 3, 'name' => 'Brood', 'quantity' => 1, 'product_reference' => 'SKU-BROOD'],
+                ['id' => null, 'name' => 'Koffie (verwijderd)', 'quantity' => 1, 'product_reference' => null],
+            ] : null,
+        ];
     }
 }

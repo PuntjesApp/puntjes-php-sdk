@@ -7,6 +7,7 @@ namespace Puntjes\Resource;
 use Puntjes\Exception\ApiException;
 use Puntjes\Exception\NotFoundException;
 use Puntjes\Model\Branch;
+use Puntjes\Model\VoucherLookup;
 use Puntjes\Model\VoucherVerification;
 
 /**
@@ -19,16 +20,48 @@ use Puntjes\Model\VoucherVerification;
 final class Vouchers extends Resource
 {
     /**
+     * Read a bon without spending it: the "is this code good?" call for the till.
+     *
+     * The bon stays as it was. An expired bon answers with `VoucherStatus::Expired`, not
+     * with an error, so the till can tell the customer why. Read the status, then spend
+     * the bon with {@see verify()}. A bon can change between the two calls, so `verify()`
+     * stays the only check that counts.
+     *
+     * A code of another vendor answers exactly as a code that was never issued, so
+     * `VOUCHER_NOT_FOUND` never confirms that a code exists somewhere else.
+     *
+     * @param  string  $code  The code from the customer's QR or printed bon.
+     *
+     * @throws NotFoundException `VOUCHER_NOT_FOUND` (404).
+     */
+    public function find(string $code): VoucherLookup
+    {
+        return VoucherLookup::fromArray(
+            $this->transport->get('/vouchers/'.$this->segment($code))->dataArray(),
+        );
+    }
+
+    /**
      * Spend a bon at the till.
      *
-     * This is a consume, not a preview — a successful call marks the bon used, and a
-     * second call answers `VOUCHER_ALREADY_USED`. There is no way to ask "is this code
-     * good?" without spending it, deliberately: a preview that could be replayed is how
-     * one bon gets honoured twice.
+     * This is a consume, not a preview. A successful call marks the bon used. To read a
+     * bon without spending it, use {@see find()}.
      *
-     * For that reason it is never retried automatically. If you retry it yourself,
-     * treat `VOUCHER_ALREADY_USED` as "possibly my own earlier attempt" rather than as
-     * a customer trying it on.
+     * Without an idempotency key, the SDK never retries this call automatically, and a
+     * second call answers `VOUCHER_ALREADY_USED`. If you retry it yourself, treat
+     * `VOUCHER_ALREADY_USED` as "possibly my own earlier attempt", not as a customer who
+     * tries the bon again.
+     *
+     * With an idempotency key, the SDK retries a failed call automatically, as it does
+     * for every POST that carries a key. A repeat with the same key on the same bon
+     * answers the first success again. Make the key from something stable in your
+     * system, for example the sale. The SDK does not make a key for you. Two refusals
+     * are possible:
+     *
+     * - the same key on another bon answers `IDEMPOTENCY_KEY_CONFLICT`, and that other
+     *   bon stays unspent;
+     * - a key sent after an earlier spend without a key answers `VOUCHER_ALREADY_USED`,
+     *   because the first spend has no key to match.
      *
      * A code belonging to another vendor answers exactly what a code that was never
      * issued answers, byte for byte — so `VOUCHER_NOT_FOUND` never confirms that a code
@@ -39,14 +72,20 @@ final class Vouchers extends Resource
      *                               Falls back to the branch this API credential defaults
      *                               to. {@see Branch::UNASSIGNED} is a filter word and is
      *                               not valid here.
+     * @param  string|null  $idempotencyKey  Up to 255 characters. Sent only when you give one.
      *
      * @throws NotFoundException `VOUCHER_NOT_FOUND` (404).
      * @throws ApiException `VOUCHER_ALREADY_USED`, `VOUCHER_EXPIRED`,
-     *                      `BRANCH_REQUIRED` or `BRANCH_NOT_FOUND` — all 422.
+     *                      `IDEMPOTENCY_KEY_CONFLICT`, `BRANCH_REQUIRED` or
+     *                      `BRANCH_NOT_FOUND` — all 422.
      */
-    public function verify(string $code, ?string $branch = null): VoucherVerification
+    public function verify(string $code, ?string $branch = null, ?string $idempotencyKey = null): VoucherVerification
     {
         $body = $branch === null ? [] : ['branch' => $branch];
+
+        if ($idempotencyKey !== null) {
+            $body['idempotency_key'] = $idempotencyKey;
+        }
 
         return VoucherVerification::fromArray(
             $this->transport->post('/vouchers/'.$this->segment($code).'/verify', $body)->dataArray(),
