@@ -11,10 +11,11 @@ use Puntjes\Support\Cast;
 /**
  * A loyalty customer belonging to the authenticated vendor.
  *
- * Two fields are populated only by `customers->lookup()`, which is the till's
- * scan-a-card call and folds the wallet balance in to save a round trip:
- * {@see $walletBalance} and {@see $isDeactivated}. Everywhere else they are null
- * and false — read the balance from `wallet->show()` instead.
+ * {@see $walletBalance} is populated only by `customers->lookup()`, which is the till's
+ * scan-a-card call and folds the wallet balance in to save a round trip. Everywhere
+ * else it is null: read the balance from `wallet->show()` instead.
+ * {@see $isDeactivated} is set by `lookup()` and by `find()`; the API sends the key only
+ * for a deactivated customer, so it is false everywhere else.
  */
 final class Customer
 {

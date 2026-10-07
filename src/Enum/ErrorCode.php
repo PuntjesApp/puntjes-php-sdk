@@ -17,7 +17,15 @@ use Puntjes\Exception\ApiException;
 enum ErrorCode: string
 {
     // Auth / transport-level
+    /**
+     * The access token is missing, unreadable, expired or revoked, or its client was
+     * revoked (401). A new token fixes it, and the SDK gets one by itself once.
+     */
     case Unauthenticated = 'UNAUTHENTICATED';
+    /**
+     * The token is valid, but its OAuth client has no vendor or cannot use client
+     * credentials (401). A new token does not fix it: the client itself is wrong.
+     */
     case InvalidClient = 'INVALID_CLIENT';
     case Forbidden = 'FORBIDDEN';
     /**
@@ -26,6 +34,13 @@ enum ErrorCode: string
      * way, so fix the body first. The SDK never replays it.
      */
     case InvalidJson = 'INVALID_JSON';
+    /**
+     * The request has a body, but its `Content-Type` is not JSON or a form, so the API
+     * cannot read it (415). Nothing was created, changed or sent. The SDK always sends
+     * JSON, so this means something between the SDK and the API changed the request.
+     * The SDK never replays it.
+     */
+    case UnsupportedMediaType = 'UNSUPPORTED_MEDIA_TYPE';
     case RouteNotFound = 'ROUTE_NOT_FOUND';
     case MethodNotAllowed = 'METHOD_NOT_ALLOWED';
     case RateLimited = 'RATE_LIMITED';

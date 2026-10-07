@@ -12,6 +12,7 @@ use Puntjes\Exception\TransportException;
 use Puntjes\Request\AdjustWallet;
 use Puntjes\Request\CreateCustomer;
 use Puntjes\Request\CreateIdentifier;
+use Puntjes\Request\CreateRewardFromProduct;
 use Puntjes\Request\SubmitTransaction;
 use Puntjes\Tests\Support\TestCase;
 
@@ -121,6 +122,49 @@ final class RetryTest extends TestCase
         self::assertIsString($first);
         self::assertNotSame('', $first);
         self::assertSame($first, $second);
+    }
+
+    public function test_a_reward_from_a_product_with_a_key_is_retried_with_the_same_key(): void
+    {
+        $this->fake->queueError(500, 'INTERNAL_ERROR');
+        $this->fake->queueData([
+            'id' => 3, 'product_id' => 5, 'name' => 'Gratis brood', 'description' => null,
+            'type' => 'free_product', 'point_cost' => 200, 'image_url' => null,
+            'total_stock' => null, 'remaining_stock' => 0,
+            'status' => ['value' => 'active', 'label' => 'Active'],
+            'available_from' => null, 'available_until' => null, 'discount_value' => null,
+            'discount_type' => null, 'product_reference' => 'SKU-1', 'payment_amount' => 0,
+            'code_valid_for_hours' => null, 'created_at' => null, 'updated_at' => null,
+            'is_unlimited' => true,
+        ], 201);
+
+        $reward = $this->puntjes()->products->createReward('SKU-1', new CreateRewardFromProduct(
+            pointCost: 200,
+            idempotencyKey: 'reward-sku-1',
+        ));
+
+        self::assertSame(3, $reward->id);
+        self::assertSame([0.5], $this->sleeps);
+        self::assertSame('reward-sku-1', $this->fake->bodyAt(1)['idempotency_key']);
+        self::assertSame('reward-sku-1', $this->fake->bodyAt(2)['idempotency_key']);
+    }
+
+    public function test_a_reward_from_a_product_without_a_key_is_never_retried(): void
+    {
+        // The SDK makes no key here: a Puntjes from before the key ignores it, and a
+        // retry would then create a second reward.
+        $this->fake->queueError(500, 'INTERNAL_ERROR');
+
+        $puntjes = $this->puntjes();
+
+        $this->expectException(ServerException::class);
+
+        try {
+            $puntjes->products->createReward('SKU-1', new CreateRewardFromProduct(pointCost: 200));
+        } finally {
+            self::assertSame(1, $this->fake->apiRequestCount());
+            self::assertSame([], $this->sleeps);
+        }
     }
 
     public function test_a_post_without_an_idempotency_key_is_never_retried(): void

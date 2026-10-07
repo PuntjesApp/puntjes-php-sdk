@@ -7,6 +7,7 @@ namespace Puntjes\Tests\Unit;
 use Puntjes\Enum\IdentifierType;
 use Puntjes\Enum\Period;
 use Puntjes\Request\CreateRedemption;
+use Puntjes\Request\CreateRewardFromProduct;
 use Puntjes\Tests\Support\TestCase;
 
 /**
@@ -180,6 +181,36 @@ final class ShapeChangeTest extends TestCase
 
         self::assertSame(0, $reward->paymentAmount);
         self::assertSame(0, $redemption->paymentAmount());
+    }
+
+    /**
+     * An API from before `is_unlimited` sends no such key. The SDK then reads it from
+     * `total_stock`, which is null exactly when a reward has no stock limit.
+     */
+    public function test_a_reward_from_before_is_unlimited_reads_it_from_the_total_stock(): void
+    {
+        $item = static fn (int $id, ?int $total): array => [
+            'id' => $id, 'name' => 'Reward '.$id, 'description' => null, 'type' => 'free_product',
+            'point_cost' => 100, 'image_url' => null, 'remaining_stock' => 0, 'total_stock' => $total,
+            'available_from' => null, 'available_until' => null,
+        ];
+        $this->fake->queueData([$item(1, null), $item(2, 10)]);
+        $this->fake->queueData([
+            'id' => 3, 'product_id' => 5, 'name' => 'Gratis brood', 'description' => null,
+            'type' => 'free_product', 'point_cost' => 200, 'image_url' => null,
+            'total_stock' => 10, 'remaining_stock' => 10,
+            'status' => ['value' => 'active', 'label' => 'Active'],
+            'available_from' => null, 'available_until' => null, 'discount_value' => null,
+            'discount_type' => null, 'product_reference' => 'SKU-1', 'code_valid_for_hours' => null,
+            'created_at' => null, 'updated_at' => null,
+        ], 201);
+
+        $rewards = $this->puntjes()->rewards->list();
+        $reward = $this->puntjes()->products->createReward('SKU-1', new CreateRewardFromProduct(pointCost: 200, totalStock: 10));
+
+        self::assertTrue($rewards[0]->isUnlimited);
+        self::assertFalse($rewards[1]->isUnlimited);
+        self::assertFalse($reward->isUnlimited);
     }
 
     public function test_a_statistics_envelope_without_a_loyalty_block_decodes(): void

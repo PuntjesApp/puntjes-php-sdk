@@ -5,6 +5,56 @@ Notable changes to `puntjes/php-sdk`. The format follows
 [semantic versioning](https://semver.org/). From 1.0.0 that promise is the ordinary one:
 a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
+## 1.5.0 — 2026-10-07
+
+Follows the Puntjes API changes of PuntjesApp/Puntjes#1084. Every change is additive: code
+that works with 1.4.0 keeps working.
+
+### Added
+
+- **`RewardSummary::$isUnlimited` and `Reward::$isUnlimited`**, from the new `is_unlimited`
+  of `GET /rewards` and `POST /products/{externalId}/reward`. True when the reward has no
+  stock limit. `remainingStock` is then `0`, so read `isUnlimited` first and do not show the
+  reward as sold out. A Puntjes that does not send the field yet reads it from `totalStock`,
+  which is null for the same rewards. The property comes last, with a default, so code that
+  builds the class by position keeps working.
+- **An optional idempotency key on `Products::createReward()`**: the new last argument
+  `CreateRewardFromProduct(idempotencyKey: ...)`, sent as `idempotency_key`. The SDK sends it
+  only when you give a key, and it does not make one for you, so a call without a key sends
+  the same body as before and is still never retried. With a key, the SDK retries a failed
+  call, and a repeat with the same key, product, `pointCost` and `paymentAmount` answers the
+  first reward as it is now. The same key with another product or another amount, or a key
+  whose reward was deleted, answers `IDEMPOTENCY_KEY_CONFLICT` (422). The key can have up to
+  255 characters. A Puntjes from before #1084 ignores the key, which is why the SDK makes none.
+- **`ErrorCode::UnsupportedMediaType`** (`UNSUPPORTED_MEDIA_TYPE`, 415): the request has a
+  body whose `Content-Type` is not JSON or a form. The SDK always sends JSON, so this means
+  something between the SDK and the API changed the request. It stays a plain `ApiException`
+  and the SDK never replays it.
+
+### Changed
+
+- **A missing or bad token answers `UNAUTHENTICATED` (401) again.** For about five weeks the
+  API answered `INVALID_CLIENT` for it. `INVALID_CLIENT` now means only that the token is
+  valid but its client is wrong: it has no vendor, or it cannot use client credentials. A new
+  token fixes `UNAUTHENTICATED` and does not fix `INVALID_CLIENT`. Both still arrive as an
+  `AuthenticationException`, whose docblock now says which is which. The SDK still gets a new
+  token once on every first 401, whatever the code, because an older Puntjes sends
+  `INVALID_CLIENT` for an expired token.
+- **`Customers::find()` returns a deactivated customer**, with `isDeactivated` true and the
+  status `deactivated`, where it threw `NotFoundException` before. No SDK code changed: the
+  field was already read. An anonymized customer is still not found.
+- **`sendCard()` and `sendCardByExternalId()` refuse a deactivated customer with
+  `CUSTOMER_DEACTIVATED` (422)**, where they answered 404 before. Nothing is sent.
+- **`CreateRewardFromProduct::$codeValidForHours` is at most 87600 (ten years)**, and
+  `$availableUntil` may not come before `$availableFrom`. Either answers 422
+  `VALIDATION_ERROR`. The docblock now says so.
+- **An empty or blank `branch:` on `Campaigns::list()` and `Statistics::get()` answers
+  `BRANCH_NOT_FOUND` (422)**, the same as an unknown key. Before, it answered every shop.
+
+No SDK change is needed for the other fixes of #1084: a customer id past 64 bits and a
+redemption or voucher code in lower case or with spaces now get their normal answer instead of
+a 500 or a 404, and a list with equal timestamps has a fixed order.
+
 ## 1.4.0 — 2026-10-06
 
 ### Added

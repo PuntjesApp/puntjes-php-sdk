@@ -37,6 +37,8 @@ final class ErrorMappingTest extends TestCase
             '422 idempotency conflict' => [422, 'IDEMPOTENCY_KEY_CONFLICT', ApiException::class],
             '422 email suppressed' => [422, 'CUSTOMER_EMAIL_SUPPRESSED', ApiException::class],
             '422 validation' => [422, 'VALIDATION_ERROR', ValidationException::class],
+            '415 unsupported media type' => [415, 'UNSUPPORTED_MEDIA_TYPE', ApiException::class],
+            '422 customer deactivated' => [422, 'CUSTOMER_DEACTIVATED', ApiException::class],
             '429 rate limited' => [429, 'RATE_LIMITED', RateLimitException::class],
             '429 plan limit' => [429, 'PLAN_LIMIT_EXCEEDED', PlanLimitExceededException::class],
             '500 internal' => [500, 'INTERNAL_ERROR', ServerException::class],
@@ -84,6 +86,25 @@ final class ErrorMappingTest extends TestCase
             self::assertTrue($e->is(ErrorCode::InvalidJson));
             self::assertSame(ErrorCode::InvalidJson, $e->errorCode());
             self::assertSame(400, $e->status());
+        }
+
+        self::assertSame(1, $this->fake->apiRequestCount());
+        self::assertSame([], $this->sleeps);
+    }
+
+    public function test_a_body_type_the_api_cannot_read_is_named_and_never_replayed(): void
+    {
+        // The SDK always sends JSON, so a 415 means something between the SDK and the
+        // API changed the body. The same request fails the same way, so it is not retried.
+        $this->fake->queueError(415, 'UNSUPPORTED_MEDIA_TYPE', 'The request body must be JSON.');
+
+        try {
+            $this->puntjes()->products->upsert('SKU-1', new UpsertProduct(name: 'Brood'));
+            self::fail('Expected an ApiException.');
+        } catch (ApiException $e) {
+            self::assertSame(ApiException::class, $e::class);
+            self::assertSame(ErrorCode::UnsupportedMediaType, $e->errorCode());
+            self::assertSame(415, $e->status());
         }
 
         self::assertSame(1, $this->fake->apiRequestCount());

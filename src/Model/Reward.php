@@ -39,12 +39,15 @@ final class Reward
         public readonly string $rawType,
         /** What the till collects on top of the points, in cents. 0 means points only. */
         public readonly int $paymentAmount = 0,
+        /** True when the reward has no stock limit. {@see $remainingStock} is then 0. */
+        public readonly bool $isUnlimited = false,
     ) {}
 
     /** @param array<array-key, mixed> $data */
     public static function fromArray(array $data): self
     {
         $rawType = Cast::string($data, 'type');
+        $totalStock = Cast::nullableInt($data, 'total_stock');
 
         return new self(
             id: Cast::int($data, 'id'),
@@ -54,7 +57,7 @@ final class Reward
             type: RewardType::tryFrom($rawType),
             pointCost: Cast::int($data, 'point_cost'),
             imageUrl: Cast::nullableString($data, 'image_url'),
-            totalStock: Cast::nullableInt($data, 'total_stock'),
+            totalStock: $totalStock,
             remainingStock: Cast::int($data, 'remaining_stock'),
             status: Cast::statusValue($data, 'status'),
             availableFrom: Cast::nullableString($data, 'available_from'),
@@ -67,6 +70,9 @@ final class Reward
             updatedAt: Cast::nullableString($data, 'updated_at'),
             rawType: $rawType,
             paymentAmount: Cast::int($data, 'payment_amount'),
+            // A Puntjes from before `is_unlimited` sends no such key; `total_stock` is
+            // null exactly when a reward has no stock limit, so it gives the same answer.
+            isUnlimited: Cast::bool($data, 'is_unlimited', $totalStock === null),
         );
     }
 }

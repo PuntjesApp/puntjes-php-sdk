@@ -33,7 +33,9 @@ final class Statistics extends Resource
      * @throws ApiException `BRANCH_NOT_FOUND` (422) for a key this vendor has no branch
      *                      for. Refused rather than answered vendor-wide: a report that
      *                      silently widens under a branch label is the one mistake
-     *                      nobody catches by reading it.
+     *                      nobody catches by reading it. An empty or blank key is
+     *                      refused the same way; a Puntjes from before
+     *                      PuntjesApp/Puntjes#1084 answered the whole vendor for it.
      */
     public function get(
         Period $period = Period::ThirtyDays,
