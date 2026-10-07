@@ -162,8 +162,13 @@ final class Products extends Resource
     /**
      * Turn a catalogue product into a redeemable `free_product` reward. Responds 201.
      *
+     * Retried automatically only when the request carries an idempotency key; see
+     * {@see CreateRewardFromProduct} for what a repeat with the same key answers.
+     *
      * @throws NotFoundException when the SKU is unknown.
-     * @throws ApiException on validation failure.
+     * @throws ApiException on validation failure, and `IDEMPOTENCY_KEY_CONFLICT` (422)
+     *                      when the key was used for another product or another amount,
+     *                      or its reward was deleted.
      */
     public function createReward(string $externalId, CreateRewardFromProduct $reward): Reward
     {

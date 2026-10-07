@@ -27,13 +27,13 @@ use Puntjes\Exception\TransportException;
  *     and converges on the same state (`PUT /products/{sku}` is the catalogue-sync
  *     primitive; `DELETE` is a soft delete; `PATCH` sets named fields).
  *   - POST — only when the body carries an `idempotency_key`. That covers
- *     `/transactions`, `/redemptions`, `/customers/{id}/wallet/adjust` and
- *     `/vouchers/{code}/verify` when the caller gives a key, where a
+ *     `/transactions`, `/redemptions`, `/customers/{id}/wallet/adjust`, and
+ *     `/vouchers/{code}/verify` and `/products/{sku}/reward` when the caller gives a key, where a
  *     unique index plus a savepoint-protected claim make a replay return the original
  *     record instead of moving points twice or spending a bon twice.
  *   - Every other POST — never. `/customers`, `/products`, `/products/batch`,
- *     `/products/{sku}/reward` and `/redemptions/{code}/verify` have no replay
- *     protection, so an auto-retry could duplicate a customer or burn a code.
+ *     `/products/{sku}/reward` without a key and `/redemptions/{code}/verify` have no
+ *     replay protection, so an auto-retry could duplicate a customer or burn a code.
  *
  * A retry only happens for failures that a later attempt could plausibly survive:
  * connection errors, 5xx, and 429 rate limiting. `PLAN_LIMIT_EXCEEDED` shares the 429
@@ -45,6 +45,9 @@ use Puntjes\Exception\TransportException;
  * A 401 triggers exactly one silent re-grant and replay, which is what makes a token
  * cached across processes safe: if it was revoked or expired early, the next call
  * transparently mints a new one. A second 401 is raised — the credentials are wrong.
+ * The re-grant happens for every 401 code, `INVALID_CLIENT` included: a new token
+ * does not fix that code on a current Puntjes, but a Puntjes from before
+ * PuntjesApp/Puntjes#1084 sent it for an expired token too. It costs one grant.
  *
  * A grant that fails *transiently* (connection error, 5xx, 429 on the token route) is
  * retried under the same budget as the request itself — and, unlike the request, it is

@@ -31,7 +31,9 @@ final class Campaigns extends Resource
      *
      * @throws ApiException `BRANCH_NOT_FOUND` (422) — the filter is refused rather than
      *                      answered unscoped, because a list that silently covers every
-     *                      shop for a mistyped key looks right and is not.
+     *                      shop for a mistyped key looks right and is not. An empty or
+     *                      blank key is refused the same way; a Puntjes from before
+     *                      PuntjesApp/Puntjes#1084 answered every campaign for it.
      */
     public function list(?string $branch = null): Paginator
     {

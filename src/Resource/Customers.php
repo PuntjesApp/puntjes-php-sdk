@@ -84,7 +84,16 @@ final class Customers extends Resource
         );
     }
 
-    /** Fetch a customer by its Puntjes id. */
+    /**
+     * Fetch a customer by its Puntjes id.
+     *
+     * A deactivated customer is returned with `isDeactivated` set and the status
+     * `deactivated`. An anonymized customer, or an id of another vendor, is not found.
+     * A Puntjes from before PuntjesApp/Puntjes#1084 answered `CUSTOMER_NOT_FOUND` for a
+     * deactivated customer too.
+     *
+     * @throws NotFoundException `CUSTOMER_NOT_FOUND` (404).
+     */
     public function find(int $customerId): Customer
     {
         return Customer::fromArray(
@@ -161,9 +170,13 @@ final class Customers extends Resource
      * spent. Ask for an address that works, or switch sending back on from the customer's
      * page in the admin portal.
      *
+     * A deactivated customer answers `CUSTOMER_DEACTIVATED` (422); nothing is sent. A
+     * Puntjes from before PuntjesApp/Puntjes#1084 answered 404 for that customer.
+     *
      * @throws NotFoundException `CUSTOMER_NOT_FOUND` (404).
      * @throws ApiException `CUSTOMER_HAS_NO_EMAIL`, `CUSTOMER_EMAIL_SUPPRESSED`,
-     *                      `LOYALTY_CARD_NOT_FOUND` or `CARD_SEND_THROTTLED` (all 422).
+     *                      `CUSTOMER_DEACTIVATED`, `LOYALTY_CARD_NOT_FOUND` or
+     *                      `CARD_SEND_THROTTLED` (all 422).
      */
     public function sendCard(int $customerId, ?string $channel = null): CardDelivery
     {

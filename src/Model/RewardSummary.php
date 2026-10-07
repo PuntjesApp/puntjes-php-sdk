@@ -23,6 +23,7 @@ final class RewardSummary
         public readonly ?RewardType $type,
         public readonly int $pointCost,
         public readonly ?string $imageUrl,
+        /** Redemptions still available. 0 for a reward with no stock limit: read {@see $isUnlimited} first. */
         public readonly int $remainingStock,
         /** Null means unlimited stock. */
         public readonly ?int $totalStock,
@@ -50,12 +51,18 @@ final class RewardSummary
          * and null means the shop gave no item number. Check it before the claim; settle with the redemption.
          */
         public readonly ?string $productReference = null,
+        /**
+         * True when the reward has no stock limit. {@see $remainingStock} is then 0, so
+         * read this first before you show a reward as sold out.
+         */
+        public readonly bool $isUnlimited = false,
     ) {}
 
     /** @param array<array-key, mixed> $data */
     public static function fromArray(array $data): self
     {
         $rawType = Cast::string($data, 'type');
+        $totalStock = Cast::nullableInt($data, 'total_stock');
 
         return new self(
             id: Cast::int($data, 'id'),
@@ -65,13 +72,16 @@ final class RewardSummary
             pointCost: Cast::int($data, 'point_cost'),
             imageUrl: Cast::nullableString($data, 'image_url'),
             remainingStock: Cast::int($data, 'remaining_stock'),
-            totalStock: Cast::nullableInt($data, 'total_stock'),
+            totalStock: $totalStock,
             availableFrom: Cast::nullableString($data, 'available_from'),
             availableUntil: Cast::nullableString($data, 'available_until'),
             rawType: $rawType,
             branches: Branch::scopeFromArray($data),
             paymentAmount: Cast::int($data, 'payment_amount'),
             productReference: Cast::nullableString($data, 'product_reference'),
+            // A Puntjes from before `is_unlimited` sends no such key; `total_stock` is
+            // null exactly when a reward has no stock limit, so it gives the same answer.
+            isUnlimited: Cast::bool($data, 'is_unlimited', $totalStock === null),
         );
     }
 

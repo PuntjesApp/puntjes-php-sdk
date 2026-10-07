@@ -10,6 +10,17 @@ namespace Puntjes\Request;
  *
  * The resulting reward is of type `free_product` and stays linked to the product.
  * Name and description default to the product's own.
+ *
+ * ## The idempotency key
+ *
+ * Optional, and the SDK does not make one for you. With a key, the SDK retries a
+ * failed call automatically, and a call with the same key, the same product, the same
+ * `pointCost` and the same `paymentAmount` answers the first reward as it is now (the
+ * shop may have changed its name, stock or dates since). The same key with another
+ * product or another amount, or a key whose reward was deleted, answers
+ * `IDEMPOTENCY_KEY_CONFLICT` (422). Without a key, every call creates a new reward and
+ * is never retried. A Puntjes from before PuntjesApp/Puntjes#1084 ignores the key, so
+ * send one only to a Puntjes that has it.
  */
 final class CreateRewardFromProduct
 {
@@ -18,9 +29,11 @@ final class CreateRewardFromProduct
      * @param  int|null  $totalStock  How many can be redeemed in total. Null means unlimited.
      * @param  string  $status  `active` or `inactive`.
      * @param  string|null  $availableFrom  `Y-m-d`.
-     * @param  string|null  $availableUntil  `Y-m-d`.
-     * @param  int|null  $codeValidForHours  Confirmation-code lifetime. Null means it never expires.
+     * @param  string|null  $availableUntil  `Y-m-d`. Not before `$availableFrom`, or the API answers 422.
+     * @param  int|null  $codeValidForHours  Confirmation-code lifetime, 1 to 87600 (ten years). Null means it never
+     *                                       expires. A larger value answers 422 `VALIDATION_ERROR`.
      * @param  int|null  $paymentAmount  What the till collects on top of the points, in cents. Null or 0 means points only.
+     * @param  string|null  $idempotencyKey  Your own key for this reward, at most 255 characters, unique per vendor.
      */
     public function __construct(
         public readonly int $pointCost,
@@ -32,6 +45,7 @@ final class CreateRewardFromProduct
         public readonly ?string $availableUntil = null,
         public readonly ?int $codeValidForHours = null,
         public readonly ?int $paymentAmount = null,
+        public readonly ?string $idempotencyKey = null,
     ) {}
 
     /** @return array<string, mixed> */
@@ -50,6 +64,7 @@ final class CreateRewardFromProduct
             'available_until' => $this->availableUntil,
             'code_valid_for_hours' => $this->codeValidForHours,
             'payment_amount' => $this->paymentAmount,
+            'idempotency_key' => $this->idempotencyKey,
         ];
 
         foreach ($optional as $key => $value) {

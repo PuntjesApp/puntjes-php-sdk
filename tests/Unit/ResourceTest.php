@@ -790,6 +790,125 @@ final class ResourceTest extends TestCase
         self::assertSame(0, (new CreateRewardFromProduct(pointCost: 200, paymentAmount: 0))->toArray()['payment_amount']);
     }
 
+    public function test_the_reward_catalogue_says_which_rewards_have_no_stock_limit(): void
+    {
+        $item = static fn (int $id, ?int $total, int $remaining, bool $unlimited): array => [
+            'id' => $id, 'name' => 'Reward '.$id, 'description' => null, 'type' => 'free_product',
+            'point_cost' => 100, 'payment_amount' => 0, 'image_url' => null,
+            'remaining_stock' => $remaining, 'total_stock' => $total,
+            'available_from' => null, 'available_until' => null, 'branches' => null,
+            'product_reference' => null, 'is_unlimited' => $unlimited,
+        ];
+        $this->fake->queueData([$item(1, null, 0, true), $item(2, 10, 4, false)]);
+
+        $rewards = $this->puntjes()->rewards->list();
+
+        self::assertTrue($rewards[0]->isUnlimited);
+        self::assertSame(0, $rewards[0]->remainingStock);
+        self::assertFalse($rewards[1]->isUnlimited);
+        self::assertSame(4, $rewards[1]->remainingStock);
+    }
+
+    public function test_a_reward_from_a_product_reads_is_unlimited(): void
+    {
+        $this->fake->queueData($this->rewardFixture(['is_unlimited' => true]), 201);
+        $this->fake->queueData($this->rewardFixture(['total_stock' => 25, 'remaining_stock' => 25, 'is_unlimited' => false]), 201);
+
+        $unlimited = $this->puntjes()->products->createReward('SKU-1', new CreateRewardFromProduct(pointCost: 200));
+        $limited = $this->puntjes()->products->createReward('SKU-1', new CreateRewardFromProduct(pointCost: 200, totalStock: 25));
+
+        self::assertTrue($unlimited->isUnlimited);
+        self::assertFalse($limited->isUnlimited);
+    }
+
+    public function test_a_reward_from_a_product_sends_the_idempotency_key_only_when_given(): void
+    {
+        $this->fake->queueData($this->rewardFixture(), 201);
+
+        $this->puntjes()->products->createReward('SKU-1', new CreateRewardFromProduct(
+            pointCost: 200,
+            idempotencyKey: 'reward-sku-1',
+        ));
+
+        self::assertSame('reward-sku-1', $this->fake->bodyAt(1)['idempotency_key']);
+        self::assertArrayNotHasKey('idempotency_key', (new CreateRewardFromProduct(pointCost: 200))->toArray());
+    }
+
+    public function test_a_reward_retry_with_the_same_key_on_another_amount_is_an_idempotency_conflict(): void
+    {
+        $this->fake->queueError(
+            422,
+            'IDEMPOTENCY_KEY_CONFLICT',
+            'This idempotency_key was already used for another product or another amount, or its reward was deleted.',
+        );
+
+        try {
+            $this->puntjes()->products->createReward('SKU-1', new CreateRewardFromProduct(
+                pointCost: 300,
+                idempotencyKey: 'reward-sku-1',
+            ));
+            self::fail('Expected an ApiException.');
+        } catch (ApiException $e) {
+            self::assertSame(ApiException::class, $e::class);
+            self::assertTrue($e->is(ErrorCode::IdempotencyKeyConflict));
+        }
+
+        self::assertSame(1, $this->fake->apiRequestCount());
+    }
+
+    public function test_a_deactivated_customer_is_shown_by_id_with_the_flag_set(): void
+    {
+        $this->fake->queueData(
+            ['is_deactivated' => true, 'deactivated_at' => '2026-10-01T10:00:00+00:00']
+            + ['status' => ['value' => 'deactivated', 'label' => 'Deactivated']]
+            + $this->customerFixture()
+        );
+        $this->fake->queueData($this->customerFixture());
+
+        $deactivated = $this->puntjes()->customers->find(9);
+        $active = $this->puntjes()->customers->find(9);
+
+        self::assertTrue($deactivated->isDeactivated);
+        self::assertSame(CustomerStatus::Deactivated, $deactivated->status);
+        self::assertNull($deactivated->walletBalance);
+        self::assertFalse($active->isDeactivated);
+    }
+
+    public function test_send_card_for_a_deactivated_customer_is_a_domain_refusal(): void
+    {
+        $this->fake->queueError(422, 'CUSTOMER_DEACTIVATED', 'This customer is deactivated.');
+
+        try {
+            $this->puntjes()->customers->sendCard(9);
+            self::fail('Expected an ApiException.');
+        } catch (ApiException $e) {
+            self::assertSame(ApiException::class, $e::class);
+            self::assertTrue($e->is(ErrorCode::CustomerDeactivated));
+            self::assertSame(422, $e->status());
+        }
+
+        self::assertSame(1, $this->fake->apiRequestCount());
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function rewardFixture(array $overrides = []): array
+    {
+        return $overrides + [
+            'id' => 3, 'product_id' => 5, 'name' => 'Gratis brood', 'description' => null,
+            'type' => 'free_product', 'point_cost' => 200, 'image_url' => null,
+            'total_stock' => null, 'remaining_stock' => 0,
+            'status' => ['value' => 'active', 'label' => 'Active'],
+            'available_from' => null, 'available_until' => null, 'discount_value' => null,
+            'discount_type' => null, 'product_reference' => 'SKU-1', 'payment_amount' => 0,
+            'code_valid_for_hours' => null,
+            'created_at' => '2026-10-07T10:00:00+00:00', 'updated_at' => '2026-10-07T10:00:00+00:00',
+            'is_unlimited' => true,
+        ];
+    }
+
     public function test_campaigns_report_the_minimum_spend_in_euros(): void
     {
         $this->fake->queuePage([[
