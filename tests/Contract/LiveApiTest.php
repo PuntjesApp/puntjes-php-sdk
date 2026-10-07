@@ -5,15 +5,21 @@ declare(strict_types=1);
 namespace Puntjes\Tests\Contract;
 
 use PHPUnit\Framework\TestCase;
+use Puntjes\Auth\AccessToken;
+use Puntjes\Auth\TokenProvider;
+use Puntjes\Config;
 use Puntjes\Enum\ErrorCode;
 use Puntjes\Enum\Period;
 use Puntjes\Enum\ProductStatus;
 use Puntjes\Exception\ApiException;
+use Puntjes\Exception\AuthenticationException;
 use Puntjes\Exception\ConflictException;
 use Puntjes\Exception\NotFoundException;
+use Puntjes\Exception\ValidationException;
 use Puntjes\Model\Branch;
 use Puntjes\Puntjes;
 use Puntjes\Request\CreateProduct;
+use Puntjes\Request\CreateRewardFromProduct;
 use Puntjes\Request\ProductFilters;
 use Puntjes\Request\UpdateProduct;
 use Puntjes\Request\UpsertProduct;
@@ -104,6 +110,38 @@ final class LiveApiTest extends TestCase
         self::assertNotSame('', $branding->displayName);
     }
 
+    public function test_a_token_the_api_cannot_read_is_unauthenticated_after_one_regrant(): void
+    {
+        $this->puntjes();
+
+        $tokens = new class implements TokenProvider
+        {
+            public int $calls = 0;
+
+            public function token(bool $forceRefresh = false): AccessToken
+            {
+                $this->calls++;
+
+                return new AccessToken('not-a-token-'.bin2hex(random_bytes(4)), time() + 3600);
+            }
+        };
+
+        $puntjes = Puntjes::fromConfig(
+            new Config('unused', 'unused', (string) getenv('PUNTJES_BASE_URL'), maxRetries: 0),
+            tokenProvider: $tokens,
+        );
+
+        try {
+            $puntjes->me();
+            self::fail('Expected an AuthenticationException.');
+        } catch (AuthenticationException $e) {
+            self::assertSame(ErrorCode::Unauthenticated, $e->errorCode());
+            self::assertSame(401, $e->status());
+        }
+
+        self::assertSame(2, $tokens->calls, 'The transport must ask for a new token exactly once.');
+    }
+
     public function test_an_unknown_customer_maps_to_a_not_found_exception(): void
     {
         try {
@@ -142,6 +180,23 @@ final class LiveApiTest extends TestCase
         }
     }
 
+    /** Read-only, on the same named customer: `find()` decodes the detail shape and its flag. */
+    public function test_finding_a_customer_by_id_decodes_the_same_customer(): void
+    {
+        $identifier = getenv('PUNTJES_CONTRACT_CUSTOMER_IDENTIFIER') ?: '';
+
+        if ($identifier === '') {
+            self::markTestSkipped('Set PUNTJES_CONTRACT_CUSTOMER_IDENTIFIER to an existing customer identifier to run this.');
+        }
+
+        $looked = $this->puntjes()->customers->lookup(identifier: $identifier);
+        $found = $this->puntjes()->customers->find($looked->id);
+
+        self::assertSame($looked->id, $found->id);
+        self::assertSame($looked->isDeactivated, $found->isDeactivated);
+        self::assertNull($found->walletBalance, 'Only lookup() carries the wallet balance.');
+    }
+
     public function test_find_by_identifier_returns_null_for_an_unknown_card(): void
     {
         self::assertNull(
@@ -156,6 +211,11 @@ final class LiveApiTest extends TestCase
         foreach ($rewards as $reward) {
             self::assertGreaterThan(0, $reward->pointCost);
             self::assertNotNull($reward->type, 'Unknown reward type on the wire: '.$reward->rawType);
+            self::assertSame($reward->totalStock === null, $reward->isUnlimited);
+
+            if ($reward->isUnlimited) {
+                self::assertSame(0, $reward->remainingStock);
+            }
 
             // Null means redeemable anywhere; a list means limited to those shops. An
             // empty list is a third thing again and must survive the round trip.
@@ -325,6 +385,30 @@ final class LiveApiTest extends TestCase
         $products->delete($sku);
 
         self::assertNull($products->findOrNull($sku));
+    }
+
+    /**
+     * Writes only a product. `pointCost: 0` is refused on every Puntjes version, so no
+     * reward is created even by a Puntjes that would accept the other two fields; the
+     * test then fails on the missing field names instead of leaving a reward behind.
+     */
+    public function test_a_reward_request_past_its_bounds_is_refused_field_by_field(): void
+    {
+        $sku = $this->sku('reward-bounds');
+        $this->puntjes()->products->upsert($sku, new UpsertProduct(name: 'SDK reward bounds'));
+
+        try {
+            $this->puntjes()->products->createReward($sku, new CreateRewardFromProduct(
+                pointCost: 0,
+                codeValidForHours: 87601,
+                idempotencyKey: str_repeat('k', 256),
+            ));
+            self::fail('Expected a ValidationException.');
+        } catch (ValidationException $e) {
+            self::assertNotSame([], $e->errorsFor('point_cost'));
+            self::assertNotSame([], $e->errorsFor('code_valid_for_hours'), 'The API must cap code validity at 87600 hours.');
+            self::assertNotSame([], $e->errorsFor('idempotency_key'), 'The API must read the idempotency key.');
+        }
     }
 
     public function test_upserting_a_new_sku_reports_it_as_created(): void
