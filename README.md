@@ -91,7 +91,8 @@ customers, so the SDK is deliberately conservative about what it replays.
 | `POST /redemptions` | ✅ | Carries an `idempotency_key` |
 | `POST …/wallet/adjust` | ✅ | Carries an `idempotency_key` |
 | `POST /customers` | ❌ | A replay would create a second customer |
-| `POST /products`, `/products/batch`, `/products/{sku}/reward` | ❌ | No replay protection |
+| `POST /products`, `/products/batch` | ❌ | No replay protection |
+| `POST /products/{sku}/reward` | ❌ unless you pass an idempotency key, then ✅ | Without a key, a replay creates a second reward. With `idempotencyKey:`, a replay answers the first reward |
 | `POST /redemptions/{code}/verify` | ❌ | A replay would answer `CODE_ALREADY_USED` |
 | `POST /vouchers/{code}/verify` | ❌ unless you pass an idempotency key, then ✅ | Verifying a bon *spends* it. Without a key, a replay answers `VOUCHER_ALREADY_USED`. With `idempotencyKey:`, a replay on the same bon answers the first success again |
 | `POST …/send-card` | ❌ | A replay emails the customer a second time |
@@ -126,6 +127,13 @@ key on another bon answers `IDEMPOTENCY_KEY_CONFLICT`, and that bon stays unspen
 sent after an earlier spend without a key answers `VOUCHER_ALREADY_USED`. To read a bon
 without spending it, call `$puntjes->vouchers->find($code)`: its `status` is
 `VoucherStatus::Valid`, `Used` or `Expired`, and an expired bon is an answer, not an error.
+
+**`products->createReward()` works the same way.** The SDK does not make a key for it, because
+a Puntjes from before the key ignores it, and a retry would then create a second reward. Pass
+`idempotencyKey:` to make it safe to retry. A repeat with the same key, the same product, the
+same `pointCost` and the same `paymentAmount` answers the first reward, even when the shop
+changed its name, stock or dates since. The same key with another product or another amount,
+or a key whose reward was deleted, answers `IDEMPOTENCY_KEY_CONFLICT` and creates nothing.
 
 ## Branches
 
@@ -243,7 +251,7 @@ try {
 
 | Exception | When |
 |---|---|
-| `AuthenticationException` | 401 — bad, revoked or unlinked credentials |
+| `AuthenticationException` | 401. `UNAUTHENTICATED`: the token is missing, unreadable, expired or revoked; the SDK already got a new one once, so the credentials are wrong or revoked. `INVALID_CLIENT`: the client is wrong (no vendor, or it cannot use client credentials); a new token does not fix it |
 | `ForbiddenException` | 403 — vendor pending, suspended or deactivated |
 | `NotFoundException` | 404 — no such record *for this vendor* |
 | `ConflictException` | 409 — duplicate identifier, external id or SKU |
@@ -251,7 +259,7 @@ try {
 | `RateLimitException` | 429 `RATE_LIMITED`, with `retryAfter()` |
 | `PlanLimitExceededException` | 429 `PLAN_LIMIT_EXCEEDED` — upgrade the plan |
 | `ServerException` | 5xx |
-| `ApiException` | Any other API error, including 400 `INVALID_JSON` and 422 domain refusals |
+| `ApiException` | Any other API error, including 400 `INVALID_JSON`, 415 `UNSUPPORTED_MEDIA_TYPE` and 422 domain refusals |
 | `TransportException` | No HTTP response at all, or a non-JSON body |
 | `ConfigurationException` | Bad settings — raised before any request |
 
@@ -304,7 +312,7 @@ $puntjes->customers->lookup(identifier: 'CARD-1');       // or externalId:
 $puntjes->customers->findByIdentifier('CARD-1');         // null instead of throwing
 $puntjes->customers->findByExternalId('PNU-1');
 $puntjes->customers->register(new CreateCustomer(...));
-$puntjes->customers->find(42);
+$puntjes->customers->find(42);                           // a deactivated customer too: isDeactivated is true
 $puntjes->customers->updateByExternalId('PNU-1', new UpdateCustomer(email: 'new@example.com'));
 $puntjes->customers->linkExternalId('CARD-1', 'PNU-1');   // backfill a legacy customer
 $puntjes->customers->sendCard(42);                        // email them their loyalty card
@@ -344,6 +352,7 @@ $puntjes->products->update('SKU-1', new UpdateProduct(priceCents: 275)); // part
 $puntjes->products->delete('SKU-1');
 $puntjes->products->batchUpsert(['SKU-1' => $a, 'SKU-2' => $b]);         // max 100
 $puntjes->products->createReward('SKU-1', new CreateRewardFromProduct(pointCost: 200));
+$puntjes->products->createReward('SKU-1', new CreateRewardFromProduct(pointCost: 200, idempotencyKey: 'reward-SKU-1'));  // safe to retry
 
 // Campaigns, statistics, vendor
 $puntjes->campaigns->list();
@@ -461,6 +470,19 @@ the vendor relies on to prove consent.
 multiplier and a schedule; a `customer_moment` one (a birthday gift, say) carries
 neither and sends null for `multiplier`, `recurrenceType` and `recurrenceConfig`.
 Branch on `family` before reading any of the three.
+
+### A reward with no stock limit
+
+`isUnlimited` on a catalogue reward and on `createReward()`'s answer is true when the reward
+has no stock limit. `remainingStock` is then `0`, so read `isUnlimited` first and do not show
+such a reward as sold out. A Puntjes that does not send the field yet reads it from
+`totalStock`, which is null for the same rewards.
+
+```php
+foreach ($puntjes->rewards->list() as $reward) {
+    $soldOut = ! $reward->isUnlimited && $reward->remainingStock === 0;
+}
+```
 
 ### A reward can cost points plus an amount
 
