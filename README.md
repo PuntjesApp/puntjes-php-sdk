@@ -522,6 +522,22 @@ if your till applies it to every unit. Puntjes leaves that choice to the till. A
 can be more than the product's price; `appliedTo()` never takes off more than you pass. A campaign's `config['gift']['discount']['product_id']` names the
 product of a discount gift, as `GET /products` returns its `id`.
 
+### A percentage or a fixed amount, before the redemption
+
+A catalogue reward says what kind of discount it is, so a till can decide before it spends the
+points. A till that adds up fixed amounts can ask the cashier first when a percentage would
+replace them, or skip the reward.
+
+```php
+$reward->isPercentageDiscount();    // true for "10% off"
+$reward->isFixedAmountDiscount();   // true for "€ 5,00 off"
+$reward->discountValue;             // 10 (percent) or 500 (cents); null for a free product
+```
+
+Both answers are false for a free product, and also on a Puntjes that does not send the kind yet:
+then the kind is unknown. Settle the sale with the redemption's `typeSpecificData`, which keeps
+the values of that moment, not with the list.
+
 ## Token storage
 
 By default tokens live in memory for one PHP process, which under PHP-FPM means one

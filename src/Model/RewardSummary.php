@@ -16,6 +16,10 @@ use Puntjes\Support\Cast;
  */
 final class RewardSummary
 {
+    public const DISCOUNT_PERCENTAGE = 'percentage';
+
+    public const DISCOUNT_FIXED_AMOUNT = 'fixed_amount';
+
     public function __construct(
         public readonly int $id,
         public readonly string $name,
@@ -56,6 +60,16 @@ final class RewardSummary
          * read this first before you show a reward as sold out.
          */
         public readonly bool $isUnlimited = false,
+        /**
+         * `percentage` or `fixed_amount` for a discount, null for a free product. A Puntjes from before
+         * PuntjesApp/Puntjes#1112 sends nothing, so it reads null there too: then the kind is unknown.
+         */
+        public readonly ?string $discountType = null,
+        /**
+         * A percentage as a whole number (10 is 10%), a fixed amount in cents (500 is € 5,00). Null for a free
+         * product. Check it before the redemption; settle with the redemption's `type_specific_data`.
+         */
+        public readonly ?int $discountValue = null,
     ) {}
 
     /** @param array<array-key, mixed> $data */
@@ -82,6 +96,8 @@ final class RewardSummary
             // A Puntjes from before `is_unlimited` sends no such key; `total_stock` is
             // null exactly when a reward has no stock limit, so it gives the same answer.
             isUnlimited: Cast::bool($data, 'is_unlimited', $totalStock === null),
+            discountType: Cast::nullableString($data, 'discount_type'),
+            discountValue: Cast::nullableInt($data, 'discount_value'),
         );
     }
 
@@ -89,6 +105,21 @@ final class RewardSummary
     public function isDiscountOnOneProduct(): bool
     {
         return $this->type === RewardType::Discount && $this->productReference !== null;
+    }
+
+    /**
+     * Whether this is a percentage discount. A till that adds up fixed amounts asks before it redeems one.
+     * False on a Puntjes that does not send the kind yet, as {@see isFixedAmountDiscount()} is.
+     */
+    public function isPercentageDiscount(): bool
+    {
+        return $this->discountType === self::DISCOUNT_PERCENTAGE;
+    }
+
+    /** Whether this is a discount of a fixed amount, in cents in {@see $discountValue}. */
+    public function isFixedAmountDiscount(): bool
+    {
+        return $this->discountType === self::DISCOUNT_FIXED_AMOUNT;
     }
 
     /** Whether this reward is redeemable at every branch, rather than a named few. */
