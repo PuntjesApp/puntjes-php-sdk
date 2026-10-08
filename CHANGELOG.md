@@ -5,6 +5,38 @@ Notable changes to `puntjes/php-sdk`. The format follows
 [semantic versioning](https://semver.org/). From 1.0.0 that promise is the ordinary one:
 a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
+## 1.6.0 — 2026-10-08
+
+Follows the Puntjes API change of PuntjesApp/Puntjes#1105: a shop can now merge two accounts
+of the same person in the admin portal. One account stays and the other closes. No route,
+field or shape changed, and no SDK code changed: the answers below already arrive through
+the types the SDK has. Code that works with 1.5.0 keeps working.
+
+### Changed
+
+- **`Wallets::adjust()` refuses a merged customer with `CUSTOMER_DEACTIVATED` (422)** for a
+  new idempotency key. A retry with a key used before the merge still returns that
+  adjustment. A deactivated customer the shop did not merge keeps today's answers. It
+  arrives as a plain `ApiException`, and the SDK never replays it.
+- **`Wallets::applePass()` and `googlePassUrl()` refuse a merged customer with
+  `CUSTOMER_DEACTIVATED` (422).** A deactivated customer the shop did not merge still gets
+  a pass.
+- **An adjustment's idempotency key also matches the adjustments of the accounts merged
+  into the customer.** A replay can then return the closed account's entry: its `walletId`
+  is that account's wallet, and its `runningBalance` is that account's balance right after
+  the adjustment, not the kept customer's balance. The same key with another amount answers
+  `IDEMPOTENCY_KEY_CONFLICT` (422).
+- **Lookups of a merged account.** The closed account answers like any deactivated customer:
+  `isDeactivated` is true, and `lookup()` gives a `walletBalance` of 0. Its active loyalty
+  cards now belong to the account that stays, so a lookup by one of those cards returns that
+  account. A lookup by the email address of the closed account answers `CUSTOMER_NOT_FOUND`
+  (404) when the account that stays has its own email address. When both accounts had an
+  external id, the closed account keeps its own: a lookup by that id returns the closed
+  account, and `updateByExternalId()` with it answers `EXTERNAL_ID_NOT_FOUND` (404).
+
+The docblocks of `adjust()`, `applePass()` and `googlePassUrl()` now name the code, and tests
+pin the 422 on all three.
+
 ## 1.5.0 — 2026-10-07
 
 Follows the Puntjes API changes of PuntjesApp/Puntjes#1084. Every change is additive: code
