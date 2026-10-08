@@ -5,12 +5,26 @@ Notable changes to `puntjes/php-sdk`. The format follows
 [semantic versioning](https://semver.org/). From 1.0.0 that promise is the ordinary one:
 a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
-## 1.6.0 — 2026-10-08
+## Unreleased
 
-Follows the Puntjes API change of PuntjesApp/Puntjes#1105: a shop can now merge two accounts
-of the same person in the admin portal. One account stays and the other closes. No route,
-field or shape changed, and no SDK code changed: the answers below already arrive through
-the types the SDK has. Code that works with 1.5.0 keeps working.
+Follows PuntjesApp/Puntjes#1112 and PuntjesApp/Puntjes#1105. Additive: code that works with 1.5.0
+keeps working. #1105 lets a shop merge two accounts of the same person in the admin portal: one
+account stays and the other closes. No route, field or shape changed for it, and no SDK code
+changed: its answers below already arrive through the types the SDK has.
+
+### Added
+
+- **`RewardSummary::$discountType` and `RewardSummary::$discountValue`**, from the new
+  `discount_type` and `discount_value` of `GET /rewards`. `discountType` is `percentage` or
+  `fixed_amount`; `discountValue` is a percentage as a whole number (`10` is 10%) or a fixed
+  amount in cents (`500` is € 5,00), the same values and units as a redemption's
+  `typeSpecificData`. Both are null for a free product. A till can now tell, before it redeems a
+  discount, whether it takes off a percentage or a fixed amount; it still settles with the
+  redemption, which keeps the values of that moment. The properties come last, with a default,
+  so code that builds the class by position keeps working.
+- **`RewardSummary::isPercentageDiscount()` and `isFixedAmountDiscount()`**, and the constants
+  `DISCOUNT_PERCENTAGE` and `DISCOUNT_FIXED_AMOUNT`. On a Puntjes that does not send the fields
+  yet, both helpers answer false: the kind is unknown, not "fixed".
 
 ### Changed
 
