@@ -47,6 +47,12 @@ changed: its answers below already arrive through the types the SDK has.
   (404) when the account that stays has its own email address. When both accounts had an
   external id, the closed account keeps its own: a lookup by that id returns the closed
   account, and `updateByExternalId()` with it answers `EXTERNAL_ID_NOT_FOUND` (404).
+- **The account that stays can change after a merge.** Its `customerSince` can move to the
+  older of the two accounts' dates. When the merge fills in a birth date that makes the person
+  younger than the consent age, the marketing consent is withdrawn: `hasMarketingConsent()`
+  turns false and `marketingConsent` carries the withdrawal, with the source `portal`.
+- **Merging is behind a per-shop switch in Puntjes**, off until Puntjes turns it on for a shop.
+  The answers above appear only for shops where it is on.
 
 The docblocks of `adjust()`, `applePass()` and `googlePassUrl()` now name the code, and tests
 pin the 422 on all three.
