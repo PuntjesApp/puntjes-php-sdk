@@ -435,6 +435,69 @@ final class ResourceTest extends TestCase
         self::assertFalse($result->discount?->isOnOneProduct());
     }
 
+    public function test_a_customers_open_vouchers_are_a_plain_list_in_the_order_puntjes_sends(): void
+    {
+        $this->fake->queueData([
+            [
+                'voucher_code' => 'BON-SOON',
+                'campaign_id' => 4,
+                'kind' => 'discount',
+                'discount' => ['kind' => 'percentage', 'percentage' => 15, 'product_reference' => null],
+                'products' => null,
+                'valid_until' => '2026-10-12',
+                'branches' => null,
+            ],
+            [
+                'voucher_code' => 'BON-GIFT',
+                'campaign_id' => 7,
+                'kind' => 'free_product',
+                'discount' => null,
+                'products' => [['id' => 41, 'name' => 'Croissant', 'quantity' => 2, 'product_reference' => 'CROISSANT-01']],
+                'valid_until' => null,
+                'branches' => [['external_id' => 'centrum', 'name' => 'Centrum', 'type' => 'physical']],
+            ],
+        ]);
+
+        $vouchers = $this->puntjes()->vouchers->forCustomer(42);
+
+        self::assertStringEndsWith('/api/v1/customers/42/vouchers', $this->fake->uriAt(1));
+        self::assertSame('GET', $this->fake->requestAt(1)->getMethod());
+        self::assertSame(['BON-SOON', 'BON-GIFT'], array_map(fn ($voucher) => $voucher->voucherCode, $vouchers));
+
+        self::assertSame(4, $vouchers[0]->campaignId);
+        self::assertFalse($vouchers[0]->isFreeProduct());
+        self::assertSame(15, $vouchers[0]->discount?->percentage);
+        self::assertNull($vouchers[0]->products);
+        self::assertSame('2026-10-12', $vouchers[0]->validUntil);
+        self::assertNull($vouchers[0]->branches);
+
+        self::assertTrue($vouchers[1]->isFreeProduct());
+        self::assertNull($vouchers[1]->discount);
+        self::assertSame('CROISSANT-01', $vouchers[1]->products[0]->productReference ?? null);
+        self::assertSame(2, $vouchers[1]->products[0]->quantity ?? null);
+        self::assertNull($vouchers[1]->validUntil);
+        self::assertSame('centrum', $vouchers[1]->branches[0]->externalId ?? null);
+    }
+
+    public function test_a_customer_with_no_open_voucher_gets_an_empty_list(): void
+    {
+        $this->fake->queueData([]);
+
+        self::assertSame([], $this->puntjes()->vouchers->forCustomer(42));
+    }
+
+    public function test_the_open_vouchers_of_an_unknown_customer_are_not_found(): void
+    {
+        $this->fake->queueError(404, 'CUSTOMER_NOT_FOUND', 'No customer found.');
+
+        try {
+            $this->puntjes()->vouchers->forCustomer(999);
+            self::fail('Expected a NotFoundException.');
+        } catch (NotFoundException $e) {
+            self::assertSame(ErrorCode::CustomerNotFound, $e->errorCode());
+        }
+    }
+
     public function test_creating_a_redemption_returns_the_confirmation_code(): void
     {
         $this->fake->queueData([

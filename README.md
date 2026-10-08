@@ -127,6 +127,8 @@ key on another bon answers `IDEMPOTENCY_KEY_CONFLICT`, and that bon stays unspen
 sent after an earlier spend without a key answers `VOUCHER_ALREADY_USED`. To read a bon
 without spending it, call `$puntjes->vouchers->find($code)`: its `status` is
 `VoucherStatus::Valid`, `Used` or `Expired`, and an expired bon is an answer, not an error.
+A customer who comes without the code can still spend a bon: `$puntjes->vouchers->forCustomer($id)`
+lists the bons they can still spend, and you verify the one they pick.
 
 **`products->createReward()` works the same way.** The SDK does not make a key for it, because
 a Puntjes from before the key ignores it, and a retry would then create a second reward. Pass
@@ -186,6 +188,7 @@ $reward->branches === null   // redeemable anywhere
 $reward->branches === []     // scoped, but every shop it named has since been deleted
 $reward->isRedeemableEverywhere();
 $campaign->runsEverywhere();
+$bon->isSpendableAt('centrum');    // an open voucher from vouchers->forCustomer()
 ```
 
 ### Rates after an import
@@ -339,6 +342,7 @@ $puntjes->redemptions->verify('PNTJ-ABC123');
 
 // Campaign bonnen — the vouchers a campaign gives away. Verifying SPENDS one.
 $puntjes->vouchers->find('BON-ABC12345');                                  // read only: status valid, used or expired
+$puntjes->vouchers->forCustomer(42);                                       // the bons still to spend, no code needed
 $puntjes->vouchers->verify('BON-ABC12345');
 $puntjes->vouchers->verify('BON-ABC12345', idempotencyKey: 'sale-'.$sale->id);  // safe to retry
 
