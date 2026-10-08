@@ -790,6 +790,58 @@ final class ResourceTest extends TestCase
         self::assertSame(0, (new CreateRewardFromProduct(pointCost: 200, paymentAmount: 0))->toArray()['payment_amount']);
     }
 
+    public function test_the_reward_catalogue_names_each_discounts_kind_and_size_before_the_redemption(): void
+    {
+        $item = static fn (int $id, string $type, ?string $discountType, ?int $discountValue): array => [
+            'id' => $id, 'name' => 'Reward '.$id, 'description' => null, 'type' => $type,
+            'point_cost' => 100, 'payment_amount' => 0, 'image_url' => null,
+            'remaining_stock' => 5, 'total_stock' => 10,
+            'available_from' => null, 'available_until' => null, 'branches' => null,
+            'product_reference' => null, 'is_unlimited' => false,
+            'discount_type' => $discountType, 'discount_value' => $discountValue,
+        ];
+        $this->fake->queueData([
+            $item(1, 'discount', 'percentage', 15),
+            $item(2, 'discount', 'fixed_amount', 500),
+            $item(3, 'free_product', null, null),
+        ]);
+
+        [$percentage, $fixed, $freeProduct] = $this->puntjes()->rewards->list();
+
+        self::assertSame('percentage', $percentage->discountType);
+        self::assertSame(15, $percentage->discountValue);
+        self::assertTrue($percentage->isPercentageDiscount());
+        self::assertFalse($percentage->isFixedAmountDiscount());
+
+        self::assertSame('fixed_amount', $fixed->discountType);
+        self::assertSame(500, $fixed->discountValue);
+        self::assertFalse($fixed->isPercentageDiscount());
+        self::assertTrue($fixed->isFixedAmountDiscount());
+
+        self::assertNull($freeProduct->discountType);
+        self::assertNull($freeProduct->discountValue);
+        self::assertFalse($freeProduct->isPercentageDiscount());
+        self::assertFalse($freeProduct->isFixedAmountDiscount());
+    }
+
+    public function test_a_catalogue_from_an_older_puntjes_leaves_the_discount_kind_unknown(): void
+    {
+        $this->fake->queueData([[
+            'id' => 1, 'name' => 'Korting', 'description' => null, 'type' => 'discount',
+            'point_cost' => 100, 'payment_amount' => 0, 'image_url' => null,
+            'remaining_stock' => 5, 'total_stock' => 10,
+            'available_from' => null, 'available_until' => null, 'branches' => null,
+            'product_reference' => null, 'is_unlimited' => false,
+        ]]);
+
+        [$reward] = $this->puntjes()->rewards->list();
+
+        self::assertNull($reward->discountType);
+        self::assertNull($reward->discountValue);
+        self::assertFalse($reward->isPercentageDiscount());
+        self::assertFalse($reward->isFixedAmountDiscount());
+    }
+
     public function test_the_reward_catalogue_says_which_rewards_have_no_stock_limit(): void
     {
         $item = static fn (int $id, ?int $total, int $remaining, bool $unlimited): array => [
