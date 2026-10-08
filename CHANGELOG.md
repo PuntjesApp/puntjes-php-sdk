@@ -7,7 +7,10 @@ a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
 ## Unreleased
 
-Follows PuntjesApp/Puntjes#1112. Additive: code that works with 1.5.0 keeps working.
+Follows PuntjesApp/Puntjes#1112 and PuntjesApp/Puntjes#1105. Additive: code that works with 1.5.0
+keeps working. #1105 lets a shop merge two accounts of the same person in the admin portal: one
+account stays and the other closes. No route, field or shape changed for it, and no SDK code
+changed: its answers below already arrive through the types the SDK has.
 
 ### Added
 
@@ -22,6 +25,37 @@ Follows PuntjesApp/Puntjes#1112. Additive: code that works with 1.5.0 keeps work
 - **`RewardSummary::isPercentageDiscount()` and `isFixedAmountDiscount()`**, and the constants
   `DISCOUNT_PERCENTAGE` and `DISCOUNT_FIXED_AMOUNT`. On a Puntjes that does not send the fields
   yet, both helpers answer false: the kind is unknown, not "fixed".
+
+### Changed
+
+- **`Wallets::adjust()` refuses a merged customer with `CUSTOMER_DEACTIVATED` (422)** for a
+  new idempotency key. A retry with a key used before the merge still returns that
+  adjustment. A deactivated customer the shop did not merge keeps today's answers. It
+  arrives as a plain `ApiException`, and the SDK never replays it.
+- **`Wallets::applePass()` and `googlePassUrl()` refuse a merged customer with
+  `CUSTOMER_DEACTIVATED` (422).** A deactivated customer the shop did not merge still gets
+  a pass.
+- **An adjustment's idempotency key also matches the adjustments of the accounts merged
+  into the customer.** A replay can then return the closed account's entry: its `walletId`
+  is that account's wallet, and its `runningBalance` is that account's balance right after
+  the adjustment, not the kept customer's balance. The same key with another amount answers
+  `IDEMPOTENCY_KEY_CONFLICT` (422).
+- **Lookups of a merged account.** The closed account answers like any deactivated customer:
+  `isDeactivated` is true, and `lookup()` gives a `walletBalance` of 0. Its active loyalty
+  cards now belong to the account that stays, so a lookup by one of those cards returns that
+  account. A lookup by the email address of the closed account answers `CUSTOMER_NOT_FOUND`
+  (404) when the account that stays has its own email address. When both accounts had an
+  external id, the closed account keeps its own: a lookup by that id returns the closed
+  account, and `updateByExternalId()` with it answers `EXTERNAL_ID_NOT_FOUND` (404).
+- **The account that stays can change after a merge.** Its `customerSince` can move to the
+  older of the two accounts' dates. When the merge fills in a birth date that makes the person
+  younger than the consent age, the marketing consent is withdrawn: `hasMarketingConsent()`
+  turns false and `marketingConsent` carries the withdrawal, with the source `portal`.
+- **Merging is behind a per-shop switch in Puntjes**, off until Puntjes turns it on for a shop.
+  The answers above appear only for shops where it is on.
+
+The docblocks of `adjust()`, `applePass()` and `googlePassUrl()` now name the code, and tests
+pin the 422 on all three.
 
 ## 1.5.0 — 2026-10-07
 
