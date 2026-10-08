@@ -259,6 +259,52 @@ final class ResourceTest extends TestCase
         self::assertSame(-50, $this->fake->bodyAt(1)['amount']);
     }
 
+    public function test_adjusting_a_merged_customer_is_a_domain_refusal_and_never_retried(): void
+    {
+        $this->fake->queueError(422, 'CUSTOMER_DEACTIVATED', 'This customer was merged into another account.');
+
+        try {
+            $this->puntjes()->wallets->adjust(42, AdjustWallet::credit(100, 'Goodwill', 'adjust-1'));
+            self::fail('Expected an ApiException.');
+        } catch (ApiException $e) {
+            self::assertSame(ApiException::class, $e::class);
+            self::assertTrue($e->is(ErrorCode::CustomerDeactivated));
+            self::assertSame(422, $e->status());
+        }
+
+        self::assertSame(1, $this->fake->apiRequestCount());
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function walletPassProvider(): array
+    {
+        return [
+            'apple' => ['applePass'],
+            'google' => ['googlePassUrl'],
+        ];
+    }
+
+    /**
+     * @dataProvider walletPassProvider
+     */
+    public function test_a_wallet_pass_for_a_merged_customer_is_a_domain_refusal(string $method): void
+    {
+        $this->fake->queueError(422, 'CUSTOMER_DEACTIVATED', 'This customer was merged into another account.');
+
+        try {
+            $this->puntjes()->wallets->{$method}(42);
+            self::fail('Expected an ApiException.');
+        } catch (ApiException $e) {
+            self::assertSame(ApiException::class, $e::class);
+            self::assertTrue($e->is(ErrorCode::CustomerDeactivated));
+            self::assertSame(422, $e->status());
+        }
+
+        self::assertSame(1, $this->fake->apiRequestCount());
+    }
+
     public function test_a_zero_adjustment_is_rejected_before_a_request(): void
     {
         $this->expectException(ConfigurationException::class);
