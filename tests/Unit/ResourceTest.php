@@ -259,6 +259,52 @@ final class ResourceTest extends TestCase
         self::assertSame(-50, $this->fake->bodyAt(1)['amount']);
     }
 
+    public function test_adjusting_a_merged_customer_is_a_domain_refusal_and_never_retried(): void
+    {
+        $this->fake->queueError(422, 'CUSTOMER_DEACTIVATED', 'This customer was merged into another account.');
+
+        try {
+            $this->puntjes()->wallets->adjust(42, AdjustWallet::credit(100, 'Goodwill', 'adjust-1'));
+            self::fail('Expected an ApiException.');
+        } catch (ApiException $e) {
+            self::assertSame(ApiException::class, $e::class);
+            self::assertTrue($e->is(ErrorCode::CustomerDeactivated));
+            self::assertSame(422, $e->status());
+        }
+
+        self::assertSame(1, $this->fake->apiRequestCount());
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function walletPassProvider(): array
+    {
+        return [
+            'apple' => ['applePass'],
+            'google' => ['googlePassUrl'],
+        ];
+    }
+
+    /**
+     * @dataProvider walletPassProvider
+     */
+    public function test_a_wallet_pass_for_a_merged_customer_is_a_domain_refusal(string $method): void
+    {
+        $this->fake->queueError(422, 'CUSTOMER_DEACTIVATED', 'This customer was merged into another account.');
+
+        try {
+            $this->puntjes()->wallets->{$method}(42);
+            self::fail('Expected an ApiException.');
+        } catch (ApiException $e) {
+            self::assertSame(ApiException::class, $e::class);
+            self::assertTrue($e->is(ErrorCode::CustomerDeactivated));
+            self::assertSame(422, $e->status());
+        }
+
+        self::assertSame(1, $this->fake->apiRequestCount());
+    }
+
     public function test_a_zero_adjustment_is_rejected_before_a_request(): void
     {
         $this->expectException(ConfigurationException::class);
@@ -851,6 +897,184 @@ final class ResourceTest extends TestCase
     {
         self::assertArrayNotHasKey('payment_amount', (new CreateRewardFromProduct(pointCost: 200))->toArray());
         self::assertSame(0, (new CreateRewardFromProduct(pointCost: 200, paymentAmount: 0))->toArray()['payment_amount']);
+    }
+
+    public function test_the_reward_catalogue_names_each_discounts_kind_and_size_before_the_redemption(): void
+    {
+        $item = static fn (int $id, string $type, ?string $discountType, ?int $discountValue): array => [
+            'id' => $id, 'name' => 'Reward '.$id, 'description' => null, 'type' => $type,
+            'point_cost' => 100, 'payment_amount' => 0, 'image_url' => null,
+            'remaining_stock' => 5, 'total_stock' => 10,
+            'available_from' => null, 'available_until' => null, 'branches' => null,
+            'product_reference' => null, 'is_unlimited' => false,
+            'discount_type' => $discountType, 'discount_value' => $discountValue,
+        ];
+        $this->fake->queueData([
+            $item(1, 'discount', 'percentage', 15),
+            $item(2, 'discount', 'fixed_amount', 500),
+            $item(3, 'free_product', null, null),
+        ]);
+
+        [$percentage, $fixed, $freeProduct] = $this->puntjes()->rewards->list();
+
+        self::assertSame('percentage', $percentage->discountType);
+        self::assertSame(15, $percentage->discountValue);
+        self::assertTrue($percentage->isPercentageDiscount());
+        self::assertFalse($percentage->isFixedAmountDiscount());
+
+        self::assertSame('fixed_amount', $fixed->discountType);
+        self::assertSame(500, $fixed->discountValue);
+        self::assertFalse($fixed->isPercentageDiscount());
+        self::assertTrue($fixed->isFixedAmountDiscount());
+
+        self::assertNull($freeProduct->discountType);
+        self::assertNull($freeProduct->discountValue);
+        self::assertFalse($freeProduct->isPercentageDiscount());
+        self::assertFalse($freeProduct->isFixedAmountDiscount());
+    }
+
+    public function test_a_catalogue_from_an_older_puntjes_leaves_the_discount_kind_unknown(): void
+    {
+        $this->fake->queueData([[
+            'id' => 1, 'name' => 'Korting', 'description' => null, 'type' => 'discount',
+            'point_cost' => 100, 'payment_amount' => 0, 'image_url' => null,
+            'remaining_stock' => 5, 'total_stock' => 10,
+            'available_from' => null, 'available_until' => null, 'branches' => null,
+            'product_reference' => null, 'is_unlimited' => false,
+        ]]);
+
+        [$reward] = $this->puntjes()->rewards->list();
+
+        self::assertNull($reward->discountType);
+        self::assertNull($reward->discountValue);
+        self::assertFalse($reward->isPercentageDiscount());
+        self::assertFalse($reward->isFixedAmountDiscount());
+    }
+
+    public function test_the_reward_catalogue_names_each_rewards_limit_per_customer_and_how_often_the_customer_redeemed_it(): void
+    {
+        $item = static fn (int $id, ?int $max, ?int $count): array => [
+            'id' => $id, 'name' => 'Reward '.$id, 'description' => null, 'type' => 'free_product',
+            'point_cost' => 100, 'payment_amount' => 0, 'image_url' => null,
+            'remaining_stock' => 5, 'total_stock' => 10,
+            'available_from' => null, 'available_until' => null, 'branches' => null,
+            'product_reference' => null, 'is_unlimited' => false,
+            'discount_type' => null, 'discount_value' => null,
+            'max_redemptions_per_customer' => $max, 'customer_redemptions' => $count,
+        ];
+        $this->fake->queueData([
+            $item(1, 3, 1),
+            $item(2, 2, 2),
+            $item(3, 2, 5),
+            $item(4, null, 4),
+            $item(5, 3, null),
+        ]);
+
+        [$oneUsed, $allUsed, $overUsed, $noLimit, $unknownCustomer] = $this->puntjes()->rewards->list(countRedemptionsFor: 'CARD-1');
+
+        self::assertSame(3, $oneUsed->maxRedemptionsPerCustomer);
+        self::assertSame(1, $oneUsed->customerRedemptions);
+        self::assertSame(2, $oneUsed->redemptionsLeft());
+
+        self::assertSame(0, $allUsed->redemptionsLeft());
+        self::assertSame(0, $overUsed->redemptionsLeft());
+
+        self::assertNull($noLimit->maxRedemptionsPerCustomer);
+        self::assertSame(4, $noLimit->customerRedemptions);
+        self::assertNull($noLimit->redemptionsLeft());
+
+        self::assertSame(3, $unknownCustomer->maxRedemptionsPerCustomer);
+        self::assertNull($unknownCustomer->customerRedemptions);
+        self::assertNull($unknownCustomer->redemptionsLeft());
+    }
+
+    public function test_a_catalogue_from_an_older_puntjes_has_no_limit_per_customer(): void
+    {
+        $this->fake->queueData([[
+            'id' => 1, 'name' => 'Gratis koffie', 'description' => null, 'type' => 'free_product',
+            'point_cost' => 100, 'payment_amount' => 0, 'image_url' => null,
+            'remaining_stock' => 5, 'total_stock' => 10,
+            'available_from' => null, 'available_until' => null, 'branches' => null,
+            'product_reference' => null, 'is_unlimited' => false,
+        ]]);
+
+        [$reward] = $this->puntjes()->rewards->list();
+
+        self::assertNull($reward->maxRedemptionsPerCustomer);
+        self::assertNull($reward->customerRedemptions);
+        self::assertNull($reward->redemptionsLeft());
+    }
+
+    public function test_the_catalogue_counts_a_customers_redemptions_without_the_affordable_filter(): void
+    {
+        $this->fake->queueData([]);
+
+        $this->puntjes()->rewards->list(countRedemptionsFor: 'CARD-1');
+
+        self::assertStringContainsString('identifier=CARD-1', $this->fake->uriAt(1));
+        self::assertStringNotContainsString('affordable', $this->fake->uriAt(1));
+    }
+
+    public function test_the_affordable_filter_and_the_redemption_count_name_one_customer(): void
+    {
+        $this->fake->queueData([]);
+
+        $this->puntjes()->rewards->list(affordableFor: 'CARD-1', countRedemptionsFor: 'CARD-1');
+
+        self::assertStringContainsString('affordable=1', $this->fake->uriAt(1));
+        self::assertStringContainsString('identifier=CARD-1', $this->fake->uriAt(1));
+
+        try {
+            $this->puntjes()->rewards->list(affordableFor: 'CARD-1', countRedemptionsFor: 'CARD-2');
+            self::fail('Expected a ConfigurationException.');
+        } catch (ConfigurationException $exception) {
+            self::assertStringContainsString('affordableFor and countRedemptionsFor differ', $exception->getMessage());
+            self::assertSame(1, $this->fake->apiRequestCount());
+        }
+    }
+
+    public function test_a_reward_from_a_product_sends_and_reads_the_limit_per_customer(): void
+    {
+        $this->fake->queueData([
+            'id' => 4, 'product_id' => 6, 'name' => 'Koffie', 'description' => null,
+            'type' => 'free_product', 'point_cost' => 150, 'image_url' => null,
+            'total_stock' => 50, 'remaining_stock' => 50,
+            'status' => ['value' => 'active', 'label' => 'Active'],
+            'available_from' => null, 'available_until' => null, 'discount_value' => null,
+            'discount_type' => null, 'product_reference' => 'SKU-1001', 'payment_amount' => 0,
+            'code_valid_for_hours' => null,
+            'created_at' => '2026-10-01T10:00:00+00:00', 'updated_at' => '2026-10-01T10:00:00+00:00',
+            'is_unlimited' => false, 'max_redemptions_per_customer' => 2,
+        ], 201);
+
+        $reward = $this->puntjes()->products->createReward('SKU-1001', new CreateRewardFromProduct(
+            pointCost: 150,
+            maxRedemptionsPerCustomer: 2,
+        ));
+
+        self::assertSame(2, $this->fake->bodyAt(1)['max_redemptions_per_customer']);
+        self::assertSame(2, $reward->maxRedemptionsPerCustomer);
+        self::assertArrayNotHasKey('max_redemptions_per_customer', (new CreateRewardFromProduct(pointCost: 150))->toArray());
+    }
+
+    public function test_a_redemption_past_the_limit_per_customer_is_refused_once_and_never_replayed(): void
+    {
+        $this->fake->queueError(
+            422,
+            'REDEMPTION_LIMIT_REACHED',
+            'This customer already redeemed this reward the most times the shop allows.',
+        );
+
+        try {
+            $this->puntjes()->redemptions->create(new CreateRedemption('CARD-1', rewardId: 3, idempotencyKey: 'sale-9'));
+            self::fail('Expected an ApiException.');
+        } catch (ApiException $e) {
+            self::assertSame(ApiException::class, $e::class);
+            self::assertSame(ErrorCode::RedemptionLimitReached, $e->errorCode());
+            self::assertSame(422, $e->status());
+        }
+
+        self::assertSame(1, $this->fake->apiRequestCount());
     }
 
     public function test_the_reward_catalogue_says_which_rewards_have_no_stock_limit(): void

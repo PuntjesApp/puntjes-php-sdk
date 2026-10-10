@@ -34,6 +34,7 @@ final class CreateRewardFromProduct
      *                                       expires. A larger value answers 422 `VALIDATION_ERROR`.
      * @param  int|null  $paymentAmount  What the till collects on top of the points, in cents. Null or 0 means points only.
      * @param  string|null  $idempotencyKey  Your own key for this reward, at most 255 characters, unique per vendor.
+     * @param  int|null  $maxRedemptionsPerCustomer  How many times one customer can redeem it, at least 1. Null means no limit.
      */
     public function __construct(
         public readonly int $pointCost,
@@ -46,6 +47,7 @@ final class CreateRewardFromProduct
         public readonly ?int $codeValidForHours = null,
         public readonly ?int $paymentAmount = null,
         public readonly ?string $idempotencyKey = null,
+        public readonly ?int $maxRedemptionsPerCustomer = null,
     ) {}
 
     /** @return array<string, mixed> */
@@ -65,6 +67,7 @@ final class CreateRewardFromProduct
             'code_valid_for_hours' => $this->codeValidForHours,
             'payment_amount' => $this->paymentAmount,
             'idempotency_key' => $this->idempotencyKey,
+            'max_redemptions_per_customer' => $this->maxRedemptionsPerCustomer,
         ];
 
         foreach ($optional as $key => $value) {

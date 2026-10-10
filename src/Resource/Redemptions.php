@@ -32,8 +32,8 @@ final class Redemptions extends Resource
      * redemption that key belongs to.
      *
      * @throws ApiException `INSUFFICIENT_BALANCE`, `OUT_OF_STOCK`,
-     *                      `REWARD_UNAVAILABLE`, `NO_WALLET` or
-     *                      `CUSTOMER_DEACTIVATED` — all 422.
+     *                      `REWARD_UNAVAILABLE`, `NO_WALLET`,
+     *                      `CUSTOMER_DEACTIVATED` or `REDEMPTION_LIMIT_REACHED` — all 422.
      * @throws ApiException `BRANCH_REQUIRED` (422) when the reward is limited to
      *                      branches and this is not one of them, or `BRANCH_NOT_FOUND`
      *                      when the key names no branch of this vendor.

@@ -94,6 +94,11 @@ enum ErrorCode: string
     case RewardNotFound = 'REWARD_NOT_FOUND';
     case RewardUnavailable = 'REWARD_UNAVAILABLE';
     case OutOfStock = 'OUT_OF_STOCK';
+    /**
+     * The customer already redeemed this reward as many times as the shop allows (422). Points and stock
+     * do not move. A cancelled redemption does not count. The SDK never replays it.
+     */
+    case RedemptionLimitReached = 'REDEMPTION_LIMIT_REACHED';
     case RedemptionNotFound = 'REDEMPTION_NOT_FOUND';
     case CodeAlreadyUsed = 'CODE_ALREADY_USED';
     case CodeExpired = 'CODE_EXPIRED';

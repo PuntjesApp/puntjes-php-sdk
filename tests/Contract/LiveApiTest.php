@@ -11,6 +11,7 @@ use Puntjes\Config;
 use Puntjes\Enum\ErrorCode;
 use Puntjes\Enum\Period;
 use Puntjes\Enum\ProductStatus;
+use Puntjes\Enum\RewardType;
 use Puntjes\Exception\ApiException;
 use Puntjes\Exception\AuthenticationException;
 use Puntjes\Exception\ConflictException;
@@ -226,6 +227,38 @@ final class LiveApiTest extends TestCase
         }
 
         self::assertIsArray($rewards);
+    }
+
+    public function test_every_discount_in_the_catalogue_names_a_kind_this_sdk_knows(): void
+    {
+        self::markTestSkipped('Needs Puntjes PR #1114 deployed');
+
+        foreach ($this->puntjes()->rewards->list() as $reward) {
+            if ($reward->type === RewardType::Discount) {
+                self::assertTrue($reward->isPercentageDiscount() || $reward->isFixedAmountDiscount(), 'Unknown discount type: '.$reward->discountType);
+                self::assertNotNull($reward->discountValue);
+            } else {
+                self::assertNull($reward->discountType);
+                self::assertNull($reward->discountValue);
+            }
+        }
+
+        self::assertTrue(true);
+    }
+
+    public function test_every_limit_per_customer_in_the_catalogue_is_at_least_one(): void
+    {
+        self::markTestSkipped('Needs Puntjes PR #1171 deployed');
+
+        foreach ($this->puntjes()->rewards->list() as $reward) {
+            self::assertNull($reward->customerRedemptions, 'No customer was named, so nothing is counted.');
+
+            if ($reward->maxRedemptionsPerCustomer !== null) {
+                self::assertGreaterThanOrEqual(1, $reward->maxRedemptionsPerCustomer);
+            }
+        }
+
+        self::assertTrue(true);
     }
 
     public function test_campaigns_paginate(): void
