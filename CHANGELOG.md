@@ -5,6 +5,28 @@ Notable changes to `puntjes/php-sdk`. The format follows
 [semantic versioning](https://semver.org/). From 1.0.0 that promise is the ordinary one:
 a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
+## Unreleased
+
+Follows PuntjesApp/Puntjes#1168. Additive: code that works with 1.6.0 keeps working.
+
+### Added
+
+- **A limit per customer on a reward** (PuntjesApp/Puntjes#1168). A shop can let each customer redeem a reward
+  only a few times. `RewardSummary::$maxRedemptionsPerCustomer` and `Reward::$maxRedemptionsPerCustomer`
+  read the new `max_redemptions_per_customer`; null means no limit.
+  `RewardSummary::$customerRedemptions` reads `customer_redemptions`: how often the customer named
+  in the call redeemed the reward, cancelled ones left out, and null when the call named nobody or
+  the identifier matched nobody. `RewardSummary::redemptionsLeft()` gives the difference, never
+  below 0, and null when either side is unknown. The properties come last, with a default.
+- **`Rewards::list(countRedemptionsFor: ...)`** sends `identifier` without `affordable`, so a till
+  gets the whole catalogue with one customer's counts. `affordableFor` fills the counts too. Two
+  different identifiers in one call throw a `ConfigurationException` before any request.
+- **`CreateRewardFromProduct::$maxRedemptionsPerCustomer`**, at least 1, sent as
+  `max_redemptions_per_customer` by `Products::createReward()`. Null sends nothing: no limit.
+- **`ErrorCode::RedemptionLimitReached`** for `REDEMPTION_LIMIT_REACHED` (422): `Redemptions::create()`
+  refuses a redemption past the customer's limit. Points and stock do not move, and the SDK never
+  replays it. A replay of an earlier idempotency key still returns the original redemption.
+
 ## 1.6.0 — 2026-10-10
 
 Follows PuntjesApp/Puntjes#1112 and PuntjesApp/Puntjes#1105. Additive: code that works with 1.5.0

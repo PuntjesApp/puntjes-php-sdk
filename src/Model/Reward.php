@@ -41,6 +41,8 @@ final class Reward
         public readonly int $paymentAmount = 0,
         /** True when the reward has no stock limit. {@see $remainingStock} is then 0. */
         public readonly bool $isUnlimited = false,
+        /** How many times one customer can redeem this reward. Null means no limit. */
+        public readonly ?int $maxRedemptionsPerCustomer = null,
     ) {}
 
     /** @param array<array-key, mixed> $data */
@@ -73,6 +75,7 @@ final class Reward
             // A Puntjes from before `is_unlimited` sends no such key; `total_stock` is
             // null exactly when a reward has no stock limit, so it gives the same answer.
             isUnlimited: Cast::bool($data, 'is_unlimited', $totalStock === null),
+            maxRedemptionsPerCustomer: Cast::nullableInt($data, 'max_redemptions_per_customer'),
         );
     }
 }

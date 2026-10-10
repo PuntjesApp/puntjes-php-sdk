@@ -70,6 +70,16 @@ final class RewardSummary
          * product. Check it before the redemption; settle with the redemption's `type_specific_data`.
          */
         public readonly ?int $discountValue = null,
+        /**
+         * How many times one customer can redeem this reward. Null means no limit, and also on a Puntjes from
+         * before PuntjesApp/Puntjes#1168, which sends nothing.
+         */
+        public readonly ?int $maxRedemptionsPerCustomer = null,
+        /**
+         * How many times the customer named in the call redeemed this reward, cancelled ones left out. Null when the
+         * call named no customer, or the identifier matched nobody. Read {@see redemptionsLeft()} for the till.
+         */
+        public readonly ?int $customerRedemptions = null,
     ) {}
 
     /** @param array<array-key, mixed> $data */
@@ -98,6 +108,8 @@ final class RewardSummary
             isUnlimited: Cast::bool($data, 'is_unlimited', $totalStock === null),
             discountType: Cast::nullableString($data, 'discount_type'),
             discountValue: Cast::nullableInt($data, 'discount_value'),
+            maxRedemptionsPerCustomer: Cast::nullableInt($data, 'max_redemptions_per_customer'),
+            customerRedemptions: Cast::nullableInt($data, 'customer_redemptions'),
         );
     }
 
@@ -120,6 +132,19 @@ final class RewardSummary
     public function isFixedAmountDiscount(): bool
     {
         return $this->discountType === self::DISCOUNT_FIXED_AMOUNT;
+    }
+
+    /**
+     * How many more times the customer named in the call can redeem this reward. 0 means `POST /redemptions` answers
+     * `REDEMPTION_LIMIT_REACHED`. Null when there is no limit, or the call named no customer: then nothing is known.
+     */
+    public function redemptionsLeft(): ?int
+    {
+        if ($this->maxRedemptionsPerCustomer === null || $this->customerRedemptions === null) {
+            return null;
+        }
+
+        return max(0, $this->maxRedemptionsPerCustomer - $this->customerRedemptions);
     }
 
     /** Whether this reward is redeemable at every branch, rather than a named few. */
