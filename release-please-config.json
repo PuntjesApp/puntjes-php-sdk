@@ -4,7 +4,6 @@
     ".": {
       "release-type": "php",
       "package-name": "puntjes/php-sdk",
-      "release-as": "2.0.0",
       "include-component-in-tag": false,
       "changelog-path": "CHANGELOG.md"
     }

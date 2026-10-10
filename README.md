@@ -329,6 +329,10 @@ reads the conventional commits on `main` (`feat:`, `fix:`, `feat!:`) and keeps o
 pull request open. That pull request holds the next version and its `CHANGELOG.md` entry.
 It merges itself when CI is green. The merge tags the version, and Packagist reads the tag.
 
+release-please chooses the version from the commit types since the last release. A `fix:`
+raises the patch number, a `feat:` raises the minor number, and a `feat!:` or a
+`BREAKING CHANGE:` line in the body raises the major number. Nobody sets the version by hand.
+
 Write commit titles in the conventional form, because they become the changelog.
 
 ## Versions
