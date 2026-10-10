@@ -18,7 +18,7 @@ final class RequestAdapterTest extends TestCase
     {
         $this->fake->queueData(['id' => 7, 'external_id' => 'SKU-1', 'name' => 'Koffie']);
 
-        $product = $this->generated()->products()->byExternalId('SKU-1')->get()->wait()->getData();
+        $product = $this->puntjes()->products()->byExternalId('SKU-1')->get()->wait()->getData();
 
         self::assertSame('Koffie', $product->getName());
         self::assertSame('/api/v1/products/SKU-1', $this->fake->lastRequest()->getUri()->getPath());
@@ -28,7 +28,7 @@ final class RequestAdapterTest extends TestCase
     {
         $this->fake->queueJson(204, null);
 
-        self::assertNull($this->generated()->products()->byExternalId('SKU-1')->delete()->wait());
+        self::assertNull($this->puntjes()->products()->byExternalId('SKU-1')->delete()->wait());
         self::assertSame('DELETE', $this->fake->lastRequest()->getMethod());
         self::assertSame('', (string) $this->fake->lastRequest()->getBody());
     }
@@ -37,14 +37,14 @@ final class RequestAdapterTest extends TestCase
     {
         $this->fake->queueJson(204, null);
 
-        self::assertNull($this->generated()->products()->byExternalId('SKU-1')->get()->wait());
+        self::assertNull($this->puntjes()->products()->byExternalId('SKU-1')->get()->wait());
     }
 
     public function test_a_202_with_a_body_becomes_the_generated_model(): void
     {
         $this->fake->queueData(['customer_id' => 5, 'channel' => 'email', 'queued' => true], 202);
 
-        $result = $this->generated()->customers()->byCustomer('5')->sendCard()->post(new SendLoyaltyCardRequestData)->wait()->getData();
+        $result = $this->puntjes()->customers()->byCustomer('5')->sendCard()->post(new SendLoyaltyCardRequestData)->wait()->getData();
 
         self::assertTrue($result->getQueued());
         self::assertSame('/api/v1/customers/5/send-card', $this->fake->lastRequest()->getUri()->getPath());
@@ -55,7 +55,7 @@ final class RequestAdapterTest extends TestCase
         $this->fake->queueJson(404, ['error' => ['code' => 'PRODUCT_NOT_FOUND', 'message' => 'No product', 'request_id' => 'r-1']]);
 
         try {
-            $this->generated()->products()->byExternalId('nope')->get()->wait();
+            $this->puntjes()->products()->byExternalId('nope')->get()->wait();
             self::fail('No exception');
         } catch (NotFoundException $e) {
             self::assertSame(ErrorCode::ProductNotFound, $e->errorCode());
@@ -70,7 +70,7 @@ final class RequestAdapterTest extends TestCase
         $this->fake->queueJson(429, ['error' => ['code' => 'A_CODE_FROM_THE_FUTURE', 'message' => 'x']], ['Retry-After' => '0']);
 
         try {
-            $this->generated()->me()->get()->wait();
+            $this->puntjes()->me()->get()->wait();
             self::fail('No exception');
         } catch (RateLimitException $e) {
             self::assertNull($e->errorCode());
@@ -86,7 +86,7 @@ final class RequestAdapterTest extends TestCase
         $body->setTotalAmount(1000);
         $body->setIdempotencyKey('k-9');
 
-        $this->generated()->transactions()->post($body)->wait();
+        $this->puntjes()->transactions()->post($body)->wait();
 
         $sent = json_decode((string) $this->fake->lastRequest()->getBody(), true);
         self::assertSame('k-9', $sent['idempotency_key']);
@@ -96,7 +96,7 @@ final class RequestAdapterTest extends TestCase
     public function test_a_raw_url_outside_the_base_url_is_never_sent(): void
     {
         try {
-            $this->generated()->products()->byExternalId('SKU-1')->withUrl('https://evil.test/api/v1/products/SKU-1')->get()->wait();
+            $this->puntjes()->products()->byExternalId('SKU-1')->withUrl('https://evil.test/api/v1/products/SKU-1')->get()->wait();
             self::fail('No exception');
         } catch (ConfigurationException $e) {
             self::assertStringContainsString('https://evil.test', $e->getMessage());

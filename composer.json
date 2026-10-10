@@ -11,6 +11,7 @@
     },
     "require": {
         "php": "^8.1",
+        "guzzlehttp/psr7": "^2.0",
         "microsoft/kiota-abstractions": "^1.5.2",
         "microsoft/kiota-serialization-json": "^1.5",
         "microsoft/kiota-serialization-text": "^1.5",
