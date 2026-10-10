@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Puntjes\Tests\Unit;
 
-use Puntjes\Enum\ErrorCode;
+use Puntjes\Generated\Errors\ErrorCode;
 use Puntjes\Exception\ApiException;
 use Puntjes\Exception\AuthenticationException;
 use Puntjes\Exception\ConflictException;

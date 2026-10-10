@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Puntjes\Tests\Unit;
 
 use Puntjes\Enum\BranchType;
-use Puntjes\Enum\ErrorCode;
+use Puntjes\Generated\Errors\ErrorCode;
 use Puntjes\Enum\Period;
 use Puntjes\Exception\ApiException;
 use Puntjes\Model\Branch;

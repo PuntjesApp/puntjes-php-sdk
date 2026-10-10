@@ -17,3 +17,6 @@ grep -rl '@QueryParameter' "$root/src/Generated" | while read -r file; do
     sed -i '0,/^namespace .*;$/s//&\n\nuse Microsoft\\Kiota\\Abstractions\\QueryParameter;/' "$file"
 done
 rm -f "$root/src/Generated/kiota-lock.json"
+mkdir -p "$root/src/Generated/Errors"
+docker run --rm -u "$(id -u):$(id -g)" -v "$root:/app" -w /app php:8.4-cli \
+  php scripts/error-codes.php spec/api.json src/Generated/Errors/ErrorCode.php

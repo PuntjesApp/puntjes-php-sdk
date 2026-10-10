@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Puntjes\Auth\AccessToken;
 use Puntjes\Auth\TokenProvider;
 use Puntjes\Config;
-use Puntjes\Enum\ErrorCode;
+use Puntjes\Generated\Errors\ErrorCode;
 use Puntjes\Enum\Period;
 use Puntjes\Enum\ProductStatus;
 use Puntjes\Enum\RewardType;
