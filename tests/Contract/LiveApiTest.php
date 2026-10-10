@@ -46,6 +46,17 @@ final class LiveApiTest extends TestCase
         );
     }
 
+    public static function tearDownAfterClass(): void
+    {
+        foreach (['a', 'b', 'c'] as $suffix) {
+            try {
+                self::client()->products()->byExternalId(self::sku($suffix))->delete()->wait();
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+    }
+
     private static function sku(string $suffix): string
     {
         return Live::runId().'-'.$suffix;
