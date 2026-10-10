@@ -17,7 +17,7 @@ final class ErrorCodeScriptTest extends TestCase
 
         self::assertSame(0, $exit);
         self::assertStringContainsString("case CustomerNotFound = 'CUSTOMER_NOT_FOUND';", $source);
-        self::assertStringContainsString("self::PlanLimitExceeded => 429,", $source);
+        self::assertStringContainsString('self::PlanLimitExceeded => 429,', $source);
         self::assertSame(3, substr_count($source, '    case '));
     }
 

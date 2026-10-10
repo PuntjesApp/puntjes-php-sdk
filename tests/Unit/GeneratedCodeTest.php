@@ -21,7 +21,7 @@ final class GeneratedCodeTest extends TestCase
         self::assertNotEmpty($annotated);
 
         foreach ($annotated as $file) {
-            self::assertStringContainsString("use Microsoft\\Kiota\\Abstractions\\QueryParameter;", (string) file_get_contents($file), $file);
+            self::assertStringContainsString('use Microsoft\\Kiota\\Abstractions\\QueryParameter;', (string) file_get_contents($file), $file);
         }
     }
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Puntjes\Http;
 
-use Puntjes\Generated\Errors\ErrorCode;
 use Puntjes\Exception\ApiException;
 use Puntjes\Exception\AuthenticationException;
 use Puntjes\Exception\ConflictException;
@@ -15,6 +14,7 @@ use Puntjes\Exception\RateLimitException;
 use Puntjes\Exception\ServerException;
 use Puntjes\Exception\TransportException;
 use Puntjes\Exception\ValidationException;
+use Puntjes\Generated\Errors\ErrorCode;
 
 /**
  * Turns a non-2xx response into the right typed exception.
