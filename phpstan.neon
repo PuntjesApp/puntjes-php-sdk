@@ -4,3 +4,5 @@ parameters:
     paths:
         - src
     treatPhpDocTypesAsCertain: false
+    excludePaths:
+        - src/Generated
