@@ -7,24 +7,10 @@ a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
 ## Unreleased
 
-Follows PuntjesApp/Puntjes#1112, PuntjesApp/Puntjes#1105 and PuntjesApp/Puntjes#1168. Additive:
-code that works with 1.5.0 keeps working. #1105 lets a shop merge two accounts of the same person
-in the admin portal: one account stays and the other closes. No route, field or shape changed for
-it, and no SDK code changed: its answers below already arrive through the types the SDK has.
+Follows PuntjesApp/Puntjes#1168. Additive: code that works with 1.6.0 keeps working.
 
 ### Added
 
-- **`RewardSummary::$discountType` and `RewardSummary::$discountValue`**, from the new
-  `discount_type` and `discount_value` of `GET /rewards`. `discountType` is `percentage` or
-  `fixed_amount`; `discountValue` is a percentage as a whole number (`10` is 10%) or a fixed
-  amount in cents (`500` is € 5,00), the same values and units as a redemption's
-  `typeSpecificData`. Both are null for a free product. A till can now tell, before it redeems a
-  discount, whether it takes off a percentage or a fixed amount; it still settles with the
-  redemption, which keeps the values of that moment. The properties come last, with a default,
-  so code that builds the class by position keeps working.
-- **`RewardSummary::isPercentageDiscount()` and `isFixedAmountDiscount()`**, and the constants
-  `DISCOUNT_PERCENTAGE` and `DISCOUNT_FIXED_AMOUNT`. On a Puntjes that does not send the fields
-  yet, both helpers answer false: the kind is unknown, not "fixed".
 - **A limit per customer on a reward** (PuntjesApp/Puntjes#1168). A shop can let each customer redeem a reward
   only a few times. `RewardSummary::$maxRedemptionsPerCustomer` and `Reward::$maxRedemptionsPerCustomer`
   read the new `max_redemptions_per_customer`; null means no limit.
@@ -40,6 +26,27 @@ it, and no SDK code changed: its answers below already arrive through the types 
 - **`ErrorCode::RedemptionLimitReached`** for `REDEMPTION_LIMIT_REACHED` (422): `Redemptions::create()`
   refuses a redemption past the customer's limit. Points and stock do not move, and the SDK never
   replays it. A replay of an earlier idempotency key still returns the original redemption.
+
+## 1.6.0 — 2026-10-10
+
+Follows PuntjesApp/Puntjes#1112 and PuntjesApp/Puntjes#1105. Additive: code that works with 1.5.0
+keeps working. #1105 lets a shop merge two accounts of the same person in the admin portal: one
+account stays and the other closes. No route, field or shape changed for it, and no SDK code
+changed: its answers below already arrive through the types the SDK has.
+
+### Added
+
+- **`RewardSummary::$discountType` and `RewardSummary::$discountValue`**, from the new
+  `discount_type` and `discount_value` of `GET /rewards`. `discountType` is `percentage` or
+  `fixed_amount`; `discountValue` is a percentage as a whole number (`10` is 10%) or a fixed
+  amount in cents (`500` is € 5,00), the same values and units as a redemption's
+  `typeSpecificData`. Both are null for a free product. A till can now tell, before it redeems a
+  discount, whether it takes off a percentage or a fixed amount; it still settles with the
+  redemption, which keeps the values of that moment. The properties come last, with a default,
+  so code that builds the class by position keeps working.
+- **`RewardSummary::isPercentageDiscount()` and `isFixedAmountDiscount()`**, and the constants
+  `DISCOUNT_PERCENTAGE` and `DISCOUNT_FIXED_AMOUNT`. On a Puntjes that does not send the fields
+  yet, both helpers answer false: the kind is unknown, not "fixed".
 
 ### Changed
 
@@ -75,7 +82,8 @@ pin the 422 on all three.
 ## 1.5.0 — 2026-10-07
 
 Follows the Puntjes API changes of PuntjesApp/Puntjes#1084. Every change is additive: code
-that works with 1.4.0 keeps working.
+that works with 1.4.0 keeps working. The voucher, cancelled-redemption and duplicate-email entries
+were listed under 1.4.0 at first, but the v1.4.0 tag does not hold them: they ship from 1.5.0.
 
 ### Added
 
@@ -97,42 +105,6 @@ that works with 1.4.0 keeps working.
   body whose `Content-Type` is not JSON or a form. The SDK always sends JSON, so this means
   something between the SDK and the API changed the request. It stays a plain `ApiException`
   and the SDK never replays it.
-
-### Changed
-
-- **A missing or bad token answers `UNAUTHENTICATED` (401) again.** For about five weeks the
-  API answered `INVALID_CLIENT` for it. `INVALID_CLIENT` now means only that the token is
-  valid but its client is wrong: it has no vendor, or it cannot use client credentials. A new
-  token fixes `UNAUTHENTICATED` and does not fix `INVALID_CLIENT`. Both still arrive as an
-  `AuthenticationException`, whose docblock now says which is which. The SDK still gets a new
-  token once on every first 401, whatever the code, because an older Puntjes sends
-  `INVALID_CLIENT` for an expired token.
-- **`Customers::find()` returns a deactivated customer**, with `isDeactivated` true and the
-  status `deactivated`, where it threw `NotFoundException` before. No SDK code changed: the
-  field was already read. An anonymized customer is still not found.
-- **`sendCard()` and `sendCardByExternalId()` refuse a deactivated customer with
-  `CUSTOMER_DEACTIVATED` (422)**, where they answered 404 before. Nothing is sent.
-- **`CreateRewardFromProduct::$codeValidForHours` is at most 87600 (ten years)**, and
-  `$availableUntil` may not come before `$availableFrom`. Either answers 422
-  `VALIDATION_ERROR`. The docblock now says so.
-- **An empty or blank `branch:` on `Campaigns::list()` and `Statistics::get()` answers
-  `BRANCH_NOT_FOUND` (422)**, the same as an unknown key. Before, it answered every shop.
-
-No SDK change is needed for the other fixes of #1084: a customer id past 64 bits and a
-redemption or voucher code in lower case or with spaces now get their normal answer instead of
-a 500 or a 404, and a list with equal timestamps has a fixed order.
-
-## 1.4.0 — 2026-10-06
-
-### Added
-
-- **The reward catalogue names the product a reward is about** (PuntjesApp/Puntjes#1067).
-  `RewardSummary::$productReference` reads the new `product_reference` of `GET /rewards`, and
-  `RewardSummary::isDiscountOnOneProduct()` says whether the till must find that product on the
-  sale before the claim. Read `type` first: for a discount, null means the whole purchase; for a
-  free product, null means the shop gave no item number. Settle the reward with the redemption's
-  values, not with the list: the shop can change a reward between the two. The new property sits
-  last with a default, and a Puntjes that does not send it reads as null.
 - **`Vouchers::find(string $code): VoucherLookup`**, for `GET /vouchers/{code}`
   (PuntjesApp/Puntjes#1068). It reads a campaign bon without spending it, so the till can check
   the bon before it calls `verify()`. `VoucherLookup` has the same fields as
@@ -172,11 +144,44 @@ a 500 or a 404, and a list with equal timestamps has a fixed order.
 
 ### Changed
 
+- **A missing or bad token answers `UNAUTHENTICATED` (401) again.** For about five weeks the
+  API answered `INVALID_CLIENT` for it. `INVALID_CLIENT` now means only that the token is
+  valid but its client is wrong: it has no vendor, or it cannot use client credentials. A new
+  token fixes `UNAUTHENTICATED` and does not fix `INVALID_CLIENT`. Both still arrive as an
+  `AuthenticationException`, whose docblock now says which is which. The SDK still gets a new
+  token once on every first 401, whatever the code, because an older Puntjes sends
+  `INVALID_CLIENT` for an expired token.
+- **`Customers::find()` returns a deactivated customer**, with `isDeactivated` true and the
+  status `deactivated`, where it threw `NotFoundException` before. No SDK code changed: the
+  field was already read. An anonymized customer is still not found.
+- **`sendCard()` and `sendCardByExternalId()` refuse a deactivated customer with
+  `CUSTOMER_DEACTIVATED` (422)**, where they answered 404 before. Nothing is sent.
+- **`CreateRewardFromProduct::$codeValidForHours` is at most 87600 (ten years)**, and
+  `$availableUntil` may not come before `$availableFrom`. Either answers 422
+  `VALIDATION_ERROR`. The docblock now says so.
+- **An empty or blank `branch:` on `Campaigns::list()` and `Statistics::get()` answers
+  `BRANCH_NOT_FOUND` (422)**, the same as an unknown key. Before, it answered every shop.
 - **The docs of a duplicate email address** (PuntjesApp/Puntjes#900). `Customers::register()`
   and `Customers::updateByExternalId()` throw `ConflictException` with `IDENTIFIER_DUPLICATE`
   (409) when another customer of the same vendor already has that email address, as profile
   email or as email identifier, a deactivated customer included. The code and the exception are
   not new. Only the docs of both methods changed.
+
+No SDK change is needed for the other fixes of #1084: a customer id past 64 bits and a
+redemption or voucher code in lower case or with spaces now get their normal answer instead of
+a 500 or a 404, and a list with equal timestamps has a fixed order.
+
+## 1.4.0 — 2026-10-06
+
+### Added
+
+- **The reward catalogue names the product a reward is about** (PuntjesApp/Puntjes#1067).
+  `RewardSummary::$productReference` reads the new `product_reference` of `GET /rewards`, and
+  `RewardSummary::isDiscountOnOneProduct()` says whether the till must find that product on the
+  sale before the claim. Read `type` first: for a discount, null means the whole purchase; for a
+  free product, null means the shop gave no item number. Settle the reward with the redemption's
+  values, not with the list: the shop can change a reward between the two. The new property sits
+  last with a default, and a Puntjes that does not send it reads as null.
 
 ## 1.3.0 — 2026-10-06
 
