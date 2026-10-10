@@ -7,10 +7,10 @@ a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
 ## Unreleased
 
-Follows PuntjesApp/Puntjes#1112 and PuntjesApp/Puntjes#1105. Additive: code that works with 1.5.0
-keeps working. #1105 lets a shop merge two accounts of the same person in the admin portal: one
-account stays and the other closes. No route, field or shape changed for it, and no SDK code
-changed: its answers below already arrive through the types the SDK has.
+Follows PuntjesApp/Puntjes#1112, PuntjesApp/Puntjes#1105 and PuntjesApp/Puntjes#1168. Additive:
+code that works with 1.5.0 keeps working. #1105 lets a shop merge two accounts of the same person
+in the admin portal: one account stays and the other closes. No route, field or shape changed for
+it, and no SDK code changed: its answers below already arrive through the types the SDK has.
 
 ### Added
 
@@ -25,6 +25,21 @@ changed: its answers below already arrive through the types the SDK has.
 - **`RewardSummary::isPercentageDiscount()` and `isFixedAmountDiscount()`**, and the constants
   `DISCOUNT_PERCENTAGE` and `DISCOUNT_FIXED_AMOUNT`. On a Puntjes that does not send the fields
   yet, both helpers answer false: the kind is unknown, not "fixed".
+- **A limit per customer on a reward** (PuntjesApp/Puntjes#1168). A shop can let each customer redeem a reward
+  only a few times. `RewardSummary::$maxRedemptionsPerCustomer` and `Reward::$maxRedemptionsPerCustomer`
+  read the new `max_redemptions_per_customer`; null means no limit.
+  `RewardSummary::$customerRedemptions` reads `customer_redemptions`: how often the customer named
+  in the call redeemed the reward, cancelled ones left out, and null when the call named nobody or
+  the identifier matched nobody. `RewardSummary::redemptionsLeft()` gives the difference, never
+  below 0, and null when either side is unknown. The properties come last, with a default.
+- **`Rewards::list(countRedemptionsFor: ...)`** sends `identifier` without `affordable`, so a till
+  gets the whole catalogue with one customer's counts. `affordableFor` fills the counts too. Two
+  different identifiers in one call throw a `ConfigurationException` before any request.
+- **`CreateRewardFromProduct::$maxRedemptionsPerCustomer`**, at least 1, sent as
+  `max_redemptions_per_customer` by `Products::createReward()`. Null sends nothing: no limit.
+- **`ErrorCode::RedemptionLimitReached`** for `REDEMPTION_LIMIT_REACHED` (422): `Redemptions::create()`
+  refuses a redemption past the customer's limit. Points and stock do not move, and the SDK never
+  replays it. A replay of an earlier idempotency key still returns the original redemption.
 
 ### Changed
 

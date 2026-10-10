@@ -246,6 +246,21 @@ final class LiveApiTest extends TestCase
         self::assertTrue(true);
     }
 
+    public function test_every_limit_per_customer_in_the_catalogue_is_at_least_one(): void
+    {
+        self::markTestSkipped('Needs Puntjes PR #1171 deployed');
+
+        foreach ($this->puntjes()->rewards->list() as $reward) {
+            self::assertNull($reward->customerRedemptions, 'No customer was named, so nothing is counted.');
+
+            if ($reward->maxRedemptionsPerCustomer !== null) {
+                self::assertGreaterThanOrEqual(1, $reward->maxRedemptionsPerCustomer);
+            }
+        }
+
+        self::assertTrue(true);
+    }
+
     public function test_campaigns_paginate(): void
     {
         $page = $this->puntjes()->campaigns->list()->firstPage();

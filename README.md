@@ -332,6 +332,7 @@ $puntjes->wallets->googlePassUrl(42);    // save URL to redirect to — EXPERIME
 // Rewards & redemptions
 $puntjes->rewards->list();
 $puntjes->rewards->list(affordableFor: 'CARD-1');
+$puntjes->rewards->list(countRedemptionsFor: 'CARD-1');           // the whole list, with this customer's count
 $puntjes->redemptions->create(new CreateRedemption('CARD-1', rewardId: 3));
 $puntjes->redemptions->find('PNTJ-ABC123');
 $puntjes->redemptions->forCustomer(42, RedemptionStatus::Valid);   // rewards still to collect, no code needed
@@ -537,6 +538,26 @@ $reward->discountValue;             // 10 (percent) or 500 (cents); null for a f
 Both answers are false for a free product, and also on a Puntjes that does not send the kind yet:
 then the kind is unknown. Settle the sale with the redemption's `typeSpecificData`, which keeps
 the values of that moment, not with the list.
+
+### A reward can have a limit per customer
+
+A shop can let each customer redeem a reward only a few times, for example "at most 3 times".
+Name the customer when you read the catalogue, and each reward says how often that customer
+redeemed it. A redemption the shop cancelled does not count.
+
+```php
+foreach ($puntjes->rewards->list(countRedemptionsFor: 'CARD-1') as $reward) {
+    $reward->maxRedemptionsPerCustomer;   // 3, or null for no limit
+    $reward->customerRedemptions;         // 1: this customer redeemed it once
+    $reward->redemptionsLeft();           // 2; 0 means grey it out
+}
+```
+
+`affordableFor` fills the same count, so a till that already filters on the balance gets it too.
+`redemptionsLeft()` is null when there is no limit, or when the identifier matched nobody: then
+nothing is known. One more redemption past the limit throws an `ApiException` with
+`REDEMPTION_LIMIT_REACHED` (422), and points and stock do not move. Set the limit on a new reward
+with `new CreateRewardFromProduct(pointCost: 150, maxRedemptionsPerCustomer: 3)`.
 
 ## Token storage
 
