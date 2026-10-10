@@ -964,7 +964,8 @@ final class ResourceTest extends TestCase
         try {
             $this->puntjes()->rewards->list(affordableFor: 'CARD-1', countRedemptionsFor: 'CARD-2');
             self::fail('Expected a ConfigurationException.');
-        } catch (ConfigurationException) {
+        } catch (ConfigurationException $exception) {
+            self::assertStringContainsString('affordableFor and countRedemptionsFor differ', $exception->getMessage());
             self::assertSame(1, $this->fake->apiRequestCount());
         }
     }

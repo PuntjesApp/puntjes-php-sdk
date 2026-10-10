@@ -30,12 +30,12 @@ final class Rewards extends Resource
      *                                            filter. {@see RewardSummary::redemptionsLeft()}
      * @return array<int, RewardSummary>
      *
-     * @throws ConfigurationException when the two identifiers name different customers.
+     * @throws ConfigurationException when the two identifiers differ: the API counts for one customer.
      */
     public function list(?string $affordableFor = null, ?string $countRedemptionsFor = null): array
     {
         if ($affordableFor !== null && $countRedemptionsFor !== null && $affordableFor !== $countRedemptionsFor) {
-            throw new ConfigurationException('The reward catalogue counts the redemptions of one customer: the customer of the affordable filter.');
+            throw new ConfigurationException('Name one customer: affordableFor and countRedemptionsFor differ, and the reward catalogue counts the redemptions of one customer only.');
         }
 
         $query = match (true) {
