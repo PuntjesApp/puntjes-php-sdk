@@ -65,4 +65,40 @@ final class HelpersTest extends TestCase
 
         WalletPass::apple($this->puntjes(), 42);
     }
+
+    public function test_the_paginator_stops_when_the_answer_is_not_the_page_it_asked_for(): void
+    {
+        $this->fake->queueData(['data' => [['external_id' => 'SKU-1', 'name' => 'x']], 'links' => [], 'meta' => ['current_page' => 1, 'last_page' => 3, 'per_page' => 1, 'total' => 3]]);
+        $this->fake->queueData(['data' => [['external_id' => 'SKU-1', 'name' => 'x']], 'links' => [], 'meta' => ['current_page' => 1, 'last_page' => 3, 'per_page' => 1, 'total' => 3]]);
+        $client = $this->puntjes();
+
+        $ids = [];
+        foreach (Paginator::of(fn (int $page) => $client->products()->get()->wait()) as $product) {
+            $ids[] = $product->getExternalId();
+        }
+
+        self::assertSame(['SKU-1'], $ids);
+    }
+
+    public function test_the_paginator_stops_when_the_page_number_is_missing(): void
+    {
+        $this->fake->queueData(['data' => [['external_id' => 'SKU-1', 'name' => 'x']], 'links' => [], 'meta' => ['last_page' => 3, 'per_page' => 1, 'total' => 3]]);
+        $this->fake->queueData(['data' => [['external_id' => 'SKU-2', 'name' => 'x']], 'links' => [], 'meta' => ['last_page' => 3, 'per_page' => 1, 'total' => 3]]);
+        $client = $this->puntjes();
+
+        $ids = [];
+        foreach (Paginator::of(fn (int $page) => $client->products()->get(new ProductsRequestBuilderGetRequestConfiguration(queryParameters: ProductsRequestBuilderGetRequestConfiguration::createQueryParameters(page: $page)))->wait()) as $product) {
+            $ids[] = $product->getExternalId();
+        }
+
+        self::assertSame(['SKU-1'], $ids);
+    }
+
+    public function test_the_paginator_stops_when_there_is_no_meta(): void
+    {
+        $this->fake->queueData(['data' => [['external_id' => 'SKU-1', 'name' => 'x']], 'links' => []]);
+        $client = $this->puntjes();
+
+        self::assertCount(1, iterator_to_array(Paginator::of(fn (int $page) => $client->products()->get()->wait())));
+    }
 }

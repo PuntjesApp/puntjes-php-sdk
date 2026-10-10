@@ -8,6 +8,7 @@ use Generator;
 
 /**
  * Walks a paginated call page by page; the API wraps each page as data.data with data.meta.
+ * It stops at the last page, and when an answer has no page number or not the page it asked for.
  */
 final class Paginator
 {
@@ -17,14 +18,19 @@ final class Paginator
      */
     public static function of(callable $fetch): Generator
     {
-        $page = 1;
-        do {
+        for ($page = 1; ; $page++) {
             $wrapper = $fetch($page)->getData();
+            $meta = $wrapper->getMeta();
+            $current = $meta?->getCurrentPage();
+            if ($page > 1 && $current !== $page) {
+                return;
+            }
             foreach ($wrapper->getData() ?? [] as $item) {
                 yield $item;
             }
-            $meta = $wrapper->getMeta();
-            $page++;
-        } while ($meta !== null && $meta->getCurrentPage() < $meta->getLastPage());
+            if ($current !== $page || $page >= $meta?->getLastPage()) {
+                return;
+            }
+        }
     }
 }
