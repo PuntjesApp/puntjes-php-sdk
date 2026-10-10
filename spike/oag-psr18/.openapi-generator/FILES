@@ -1,5 +1,4 @@
 .gitignore
-.openapi-generator-ignore
 .php-cs-fixer.dist.php
 .travis.yml
 README.md
@@ -27,7 +26,9 @@ src/Model/AdjustWalletApiData.php
 src/Model/AnniversaryCampaignConfigData.php
 src/Model/AnniversaryCampaignConfigDataGift.php
 src/Model/BranchReferenceData.php
+src/Model/BulkUpsertItemData.php
 src/Model/BulkUpsertProducts200Response.php
+src/Model/BulkUpsertProductsRequest.php
 src/Model/BulkUpsertResponseData.php
 src/Model/BulkUpsertResultData.php
 src/Model/BulkUpsertSummaryData.php

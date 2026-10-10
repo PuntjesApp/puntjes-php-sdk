@@ -862,7 +862,7 @@ class WalletApi
 
 
         $headers = $this->headerSelector->selectHeaders(
-            ['application/json'],
+            ['application/json', 'application/vnd.apple.pkpass'],
             '',
             $multipart
         );

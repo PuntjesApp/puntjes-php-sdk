@@ -177,28 +177,30 @@ class ProductsApi
     /**
      * Operation bulkUpsertProducts
      *
+     * @param  \Puntjes\Spike\Oag\Model\BulkUpsertProductsRequest $bulk_upsert_products_request bulk_upsert_products_request (required)
      *
      * @throws \Puntjes\Spike\Oag\ApiException on non-2xx response
      * @throws \InvalidArgumentException
      * @return \Puntjes\Spike\Oag\Model\BulkUpsertProducts200Response|\Puntjes\Spike\Oag\Model\ErrorResponse|\Puntjes\Spike\Oag\Model\ErrorResponse|\Puntjes\Spike\Oag\Model\ErrorResponse|\Puntjes\Spike\Oag\Model\ErrorResponse|\Puntjes\Spike\Oag\Model\ErrorResponse|\Puntjes\Spike\Oag\Model\ErrorResponse|\Puntjes\Spike\Oag\Model\ErrorResponse
      */
-    public function bulkUpsertProducts()
+    public function bulkUpsertProducts($bulk_upsert_products_request)
     {
-        list($response) = $this->bulkUpsertProductsWithHttpInfo();
+        list($response) = $this->bulkUpsertProductsWithHttpInfo($bulk_upsert_products_request);
         return $response;
     }
 
     /**
      * Operation bulkUpsertProductsWithHttpInfo
      *
+     * @param  \Puntjes\Spike\Oag\Model\BulkUpsertProductsRequest $bulk_upsert_products_request (required)
      *
      * @throws \Puntjes\Spike\Oag\ApiException on non-2xx response
      * @throws \InvalidArgumentException
      * @return array of \Puntjes\Spike\Oag\Model\BulkUpsertProducts200Response|\Puntjes\Spike\Oag\Model\ErrorResponse|\Puntjes\Spike\Oag\Model\ErrorResponse|\Puntjes\Spike\Oag\Model\ErrorResponse|\Puntjes\Spike\Oag\Model\ErrorResponse|\Puntjes\Spike\Oag\Model\ErrorResponse|\Puntjes\Spike\Oag\Model\ErrorResponse|\Puntjes\Spike\Oag\Model\ErrorResponse, HTTP status code, HTTP response headers (array of strings)
      */
-    public function bulkUpsertProductsWithHttpInfo()
+    public function bulkUpsertProductsWithHttpInfo($bulk_upsert_products_request)
     {
-        $request = $this->bulkUpsertProductsRequest();
+        $request = $this->bulkUpsertProductsRequest($bulk_upsert_products_request);
 
         try {
             try {
@@ -373,13 +375,14 @@ class ProductsApi
     /**
      * Operation bulkUpsertProductsAsync
      *
+     * @param  \Puntjes\Spike\Oag\Model\BulkUpsertProductsRequest $bulk_upsert_products_request (required)
      *
      * @throws \InvalidArgumentException
      * @return Promise
      */
-    public function bulkUpsertProductsAsync()
+    public function bulkUpsertProductsAsync($bulk_upsert_products_request)
     {
-        return $this->bulkUpsertProductsAsyncWithHttpInfo()
+        return $this->bulkUpsertProductsAsyncWithHttpInfo($bulk_upsert_products_request)
             ->then(
                 function ($response) {
                     return $response[0];
@@ -390,14 +393,15 @@ class ProductsApi
     /**
      * Operation bulkUpsertProductsAsyncWithHttpInfo
      *
+     * @param  \Puntjes\Spike\Oag\Model\BulkUpsertProductsRequest $bulk_upsert_products_request (required)
      *
      * @throws \InvalidArgumentException
      * @return Promise
      */
-    public function bulkUpsertProductsAsyncWithHttpInfo()
+    public function bulkUpsertProductsAsyncWithHttpInfo($bulk_upsert_products_request)
     {
         $returnType = '\Puntjes\Spike\Oag\Model\BulkUpsertProducts200Response';
-        $request = $this->bulkUpsertProductsRequest();
+        $request = $this->bulkUpsertProductsRequest($bulk_upsert_products_request);
 
         return $this->httpAsyncClient->sendAsyncRequest($request)
             ->then(
@@ -434,12 +438,19 @@ class ProductsApi
     /**
      * Create request for operation 'bulkUpsertProducts'
      *
+     * @param  \Puntjes\Spike\Oag\Model\BulkUpsertProductsRequest $bulk_upsert_products_request (required)
      *
      * @throws \InvalidArgumentException
      * @return RequestInterface
      */
-    public function bulkUpsertProductsRequest()
+    public function bulkUpsertProductsRequest($bulk_upsert_products_request)
     {
+        // verify the required parameter 'bulk_upsert_products_request' is set
+        if ($bulk_upsert_products_request === null || (is_array($bulk_upsert_products_request) && count($bulk_upsert_products_request) === 0)) {
+            throw new \InvalidArgumentException(
+                'Missing the required parameter $bulk_upsert_products_request when calling bulkUpsertProducts'
+            );
+        }
 
         $resourcePath = '/products/batch';
         $formParams = [];
@@ -454,12 +465,18 @@ class ProductsApi
 
         $headers = $this->headerSelector->selectHeaders(
             ['application/json'],
-            '',
+            'application/json',
             $multipart
         );
 
         // for model (json/xml)
-        if (count($formParams) > 0) {
+        if (isset($bulk_upsert_products_request)) {
+            if ($this->headerSelector->isJsonMime($headers['Content-Type'])) {
+                $httpBody = json_encode(ObjectSerializer::sanitizeForSerialization($bulk_upsert_products_request));
+            } else {
+                $httpBody = $bulk_upsert_products_request;
+            }
+        } elseif (count($formParams) > 0) {
             if ($multipart) {
                 $multipartContents = [];
                 foreach ($formParams as $formParamName => $formParamValue) {

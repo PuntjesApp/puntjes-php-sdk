@@ -164,9 +164,11 @@ final class OagContractTest extends TestCase
 
     public function test_bulk_upsert_products(): void
     {
-        $result = self::api(Api\ProductsApi::class)->bulkUpsertProducts();
+        $result = self::api(Api\ProductsApi::class)->bulkUpsertProducts(new Model\BulkUpsertProductsRequest([
+            'products' => [new Model\BulkUpsertItemData(['external_id' => self::sku('c'), 'name' => 'Spike product C', 'category' => Live::runId()])],
+        ]));
 
-        self::assertInstanceOf(Model\BulkUpsertProducts200Response::class, $result, 'The spec gives this operation no request body, so the client cannot send the products');
+        self::assertSame(1, $result->getData()->getSummary()->getTotal());
         Live::hit(self::CLIENT, 'bulkUpsertProducts');
     }
 
@@ -382,11 +384,16 @@ final class OagContractTest extends TestCase
         Live::hit(self::CLIENT, 'verifyVoucher');
     }
 
-    public function test_download_wallet_pass(): void
+    public function test_download_wallet_pass_needs_a_hand_written_send(): void
     {
-        $result = self::api(Api\WalletApi::class)->downloadWalletPass((string) self::$state['customer'], 'apple');
+        $api = self::api(Api\WalletApi::class);
+        $request = $api->downloadWalletPassRequest((string) self::$state['customer'], 'apple')
+            ->withHeader('Accept', 'application/vnd.apple.pkpass');
 
-        self::assertNotNull($result, 'Apple answers a pkpass file the spec does not describe');
+        $response = (new \Symfony\Component\HttpClient\Psr18Client)->sendRequest($request);
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringStartsWith('PK', (string) $response->getBody());
         Live::hit(self::CLIENT, 'downloadWalletPass');
     }
 
@@ -431,6 +438,7 @@ final class OagContractTest extends TestCase
         $api = self::api(Api\ProductsApi::class);
         $api->deleteProduct(self::sku('a'));
         $api->deleteProduct(self::sku('b'));
+        $api->deleteProduct(self::sku('c'));
 
         self::assertCount(0, $api->listProducts(null, Live::runId())->getData()->getData());
         Live::hit(self::CLIENT, 'deleteProduct');

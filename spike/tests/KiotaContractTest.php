@@ -171,7 +171,14 @@ final class KiotaContractTest extends TestCase
 
     public function test_bulk_upsert_products(): void
     {
-        self::assertNotNull(self::client()->products()->batch()->post()->wait(), 'The spec gives this operation no request body, so the client cannot send the products');
+        $item = new Models\BulkUpsertItemData;
+        $item->setExternalId(self::sku('c'));
+        $item->setName('Spike product C');
+        $item->setCategory(Live::runId());
+        $body = new \Puntjes\Spike\Kiota\Products\Batch\BatchPostRequestBody;
+        $body->setProducts([$item]);
+
+        self::assertSame(1, self::client()->products()->batch()->post($body)->wait()->getData()->getSummary()->getTotal());
         Live::hit(self::CLIENT, 'bulkUpsertProducts');
     }
 
@@ -363,11 +370,18 @@ final class KiotaContractTest extends TestCase
         Live::hit(self::CLIENT, 'verifyVoucher');
     }
 
-    public function test_download_wallet_pass(): void
+    public function test_download_wallet_pass_needs_a_hand_written_send(): void
     {
         $config = new WalletPassRequestBuilderGetRequestConfiguration(queryParameters: WalletPassRequestBuilderGetRequestConfiguration::createQueryParameters(new GetPlatformQueryParameterType('apple')));
+        $client = self::client();
+        $request = $client->customers()->byCustomer(self::customer())->walletPass()->toGetRequestInformation($config);
+        $request->removeHeader('Accept');
+        $request->addHeader('Accept', 'application/vnd.apple.pkpass');
 
-        self::assertNotNull(self::client()->customers()->byCustomer(self::customer())->walletPass()->get($config)->wait(), 'Apple answers a pkpass file the spec does not describe');
+        $adapter = (new \ReflectionProperty($client, 'requestAdapter'))->getValue($client);
+        $stream = $adapter->sendPrimitiveAsync($request, \Psr\Http\Message\StreamInterface::class, ['XXX' => [Models\ErrorResponse::class, 'createFromDiscriminatorValue']])->wait();
+
+        self::assertStringStartsWith('PK', (string) $stream);
         Live::hit(self::CLIENT, 'downloadWalletPass');
     }
 
@@ -405,6 +419,7 @@ final class KiotaContractTest extends TestCase
         $products = self::client()->products();
         $products->byExternalId(self::sku('a'))->delete()->wait();
         $products->byExternalId(self::sku('b'))->delete()->wait();
+        $products->byExternalId(self::sku('c'))->delete()->wait();
 
         $config = new ProductsRequestBuilderGetRequestConfiguration(queryParameters: ProductsRequestBuilderGetRequestConfiguration::createQueryParameters(category: Live::runId()));
         self::assertCount(0, $products->get($config)->wait()->getData()->getData());
