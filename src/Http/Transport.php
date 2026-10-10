@@ -124,10 +124,32 @@ final class Transport
         array $headers = [],
     ): Response {
         $method = strtoupper($method);
-        $url = $this->config->apiUrl($path);
         $encodedBody = $body === null ? null : json_encode($body, JSON_THROW_ON_ERROR);
-        $retryable = self::isRetryable($method, $body);
 
+        return $this->send($method, $this->config->apiUrl($path), $query, $encodedBody, self::isRetryable($method, $body), $headers);
+    }
+
+    /**
+     * Sends a request built elsewhere, the generated client's, under the same token, retry and error rules.
+     *
+     * @param  array<string, string>  $headers
+     *
+     * @throws ApiException|TransportException
+     */
+    public function sendRaw(string $method, string $url, array $headers, ?string $body): Response
+    {
+        $method = strtoupper($method);
+        $decoded = $body === null || $body === '' ? null : json_decode($body, true);
+
+        return $this->send($method, $url, [], $body === '' ? null : $body, self::isRetryable($method, is_array($decoded) ? $decoded : null), $headers);
+    }
+
+    /**
+     * @param  array<string, mixed>  $query
+     * @param  array<string, string>  $headers
+     */
+    private function send(string $method, string $url, array $query, ?string $encodedBody, bool $retryable, array $headers): Response
+    {
         $attempt = 0;
         $tokenRefreshed = false;
         $forceRefresh = false;
@@ -158,7 +180,7 @@ final class Transport
                     'Accept' => 'application/json',
                     'Authorization' => $token->authorizationHeader(),
                 ],
-                $encodedBody === null ? [] : ['Content-Type' => 'application/json'],
+                $encodedBody === null || self::hasHeader($headers, 'Content-Type') ? [] : ['Content-Type' => 'application/json'],
                 $headers,
             );
 
@@ -204,6 +226,18 @@ final class Transport
 
             throw $exception;
         }
+    }
+
+    /** @param array<string, string> $headers */
+    private static function hasHeader(array $headers, string $name): bool
+    {
+        foreach (array_keys($headers) as $key) {
+            if (strcasecmp((string) $key, $name) === 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

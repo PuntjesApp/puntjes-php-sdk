@@ -228,6 +228,19 @@ final class FakeHttpClient implements ClientInterface
         ));
     }
 
+    /**
+     * API requests whose URI path equals $path, in order.
+     *
+     * @return array<int, RequestInterface>
+     */
+    public function requestsTo(string $path): array
+    {
+        return array_values(array_filter(
+            $this->apiRequests(),
+            static fn (RequestInterface $r): bool => $r->getUri()->getPath() === $path,
+        ));
+    }
+
     public function apiRequestCount(): int
     {
         return count($this->apiRequests());
