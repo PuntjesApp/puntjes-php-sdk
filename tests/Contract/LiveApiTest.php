@@ -350,6 +350,18 @@ final class LiveApiTest extends TestCase
         }
     }
 
+    public function test_the_open_vouchers_of_an_unknown_customer_are_not_found(): void
+    {
+        self::markTestSkipped('Needs Puntjes PR #1111 deployed');
+
+        try {
+            $this->puntjes()->vouchers->forCustomer(PHP_INT_MAX);
+            self::fail('An unknown customer must not have a voucher list.');
+        } catch (NotFoundException $e) {
+            self::assertSame('CUSTOMER_NOT_FOUND', $e->code());
+        }
+    }
+
     public function test_linking_an_unknown_identifier_is_not_found(): void
     {
         // Nothing is written: the customer lookup fails before any link is attempted.

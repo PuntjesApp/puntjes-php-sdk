@@ -7,6 +7,7 @@ namespace Puntjes\Resource;
 use Puntjes\Exception\ApiException;
 use Puntjes\Exception\NotFoundException;
 use Puntjes\Model\Branch;
+use Puntjes\Model\OpenVoucher;
 use Puntjes\Model\VoucherLookup;
 use Puntjes\Model\VoucherVerification;
 
@@ -19,6 +20,36 @@ use Puntjes\Model\VoucherVerification;
  */
 final class Vouchers extends Resource
 {
+    /**
+     * The bons a customer can still spend: the call for a till whose customer comes
+     * without the code.
+     *
+     * One plain list, not paginated. The bon that runs out first comes first and a bon
+     * that never runs out comes last. A bon that was spent, or whose last day has
+     * passed, is left out; a bon stays in for the whole of its last day, Belgian time.
+     * Show the list, let the customer pick, then spend that bon with {@see verify()}.
+     * {@see OpenVoucher::isSpendableAt()} tells whether this shop takes it.
+     *
+     * A deactivated customer still gets their list, because their bons can still be spent.
+     *
+     * @param  int  $customerId  The Puntjes customer id, as {@see Customers::lookup()} returns it.
+     * @return array<int, OpenVoucher>
+     *
+     * @throws NotFoundException `CUSTOMER_NOT_FOUND`, also for a customer of another vendor.
+     */
+    public function forCustomer(int $customerId): array
+    {
+        $vouchers = [];
+
+        foreach ($this->transport->get('/customers/'.$this->segment($customerId).'/vouchers')->dataArray() as $row) {
+            if (is_array($row)) {
+                $vouchers[] = OpenVoucher::fromArray($row);
+            }
+        }
+
+        return $vouchers;
+    }
+
     /**
      * Read a bon without spending it: the "is this code good?" call for the till.
      *

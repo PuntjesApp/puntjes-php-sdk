@@ -7,7 +7,8 @@ a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
 ## Unreleased
 
-Follows PuntjesApp/Puntjes#1168. Additive: code that works with 1.6.0 keeps working.
+Follows PuntjesApp/Puntjes#1168 and PuntjesApp/Puntjes#1089. Additive: code that works with 1.6.0 keeps
+working. `Vouchers::forCustomer()` needs a Puntjes with #1089 deployed; an older one answers it with a 404.
 
 ### Added
 
@@ -26,6 +27,17 @@ Follows PuntjesApp/Puntjes#1168. Additive: code that works with 1.6.0 keeps work
 - **`ErrorCode::RedemptionLimitReached`** for `REDEMPTION_LIMIT_REACHED` (422): `Redemptions::create()`
   refuses a redemption past the customer's limit. Points and stock do not move, and the SDK never
   replays it. A replay of an earlier idempotency key still returns the original redemption.
+- **`Vouchers::forCustomer(int $customerId)`**, from the new `GET /customers/{customer}/vouchers`.
+  It lists the campaign bons a customer can still spend, for a customer who comes to the till
+  without the code: show the list, let them pick, then `verify()` that bon. It is one plain
+  list, not a `Paginator`. The bon that runs out first comes first, a bon that never runs out
+  comes last, and a spent or expired bon is not in it. A deactivated customer still gets their
+  list. An unknown customer, or one of another vendor, throws `NotFoundException` with
+  `CUSTOMER_NOT_FOUND`.
+- **`OpenVoucher`**, one item of that list: `voucherCode`, `campaignId`, `kind`, `discount`,
+  `products`, `validUntil` and `branches`, the shops that take the bon (null means every shop).
+  `isSpendableAt('centrum')` tells a till whether its shop takes the bon; elsewhere `verify()`
+  answers `BRANCH_REQUIRED`.
 
 ## 1.6.0 — 2026-10-10
 

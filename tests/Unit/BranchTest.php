@@ -220,6 +220,33 @@ final class BranchTest extends TestCase
         self::assertFalse($rewards[2]->isRedeemableEverywhere());
     }
 
+    public function test_an_open_voucher_says_which_shops_take_it(): void
+    {
+        $this->fake->queueData([
+            [
+                'voucher_code' => 'BON-ANY', 'campaign_id' => 4, 'kind' => 'discount',
+                'discount' => ['kind' => 'fixed', 'amount_cents' => 500, 'product_reference' => null],
+                'products' => null, 'valid_until' => null,
+                'branches' => null,
+            ],
+            [
+                'voucher_code' => 'BON-WEB', 'campaign_id' => 5, 'kind' => 'discount',
+                'discount' => ['kind' => 'fixed', 'amount_cents' => 500, 'product_reference' => null],
+                'products' => null, 'valid_until' => null,
+                'branches' => [['external_id' => 'webshop', 'name' => 'Webshop', 'type' => 'online']],
+            ],
+        ]);
+
+        [$anywhere, $webshopOnly] = $this->puntjes()->vouchers->forCustomer(42);
+
+        self::assertTrue($anywhere->isSpendableEverywhere());
+        self::assertTrue($anywhere->isSpendableAt('centrum'));
+
+        self::assertFalse($webshopOnly->isSpendableEverywhere());
+        self::assertTrue($webshopOnly->isSpendableAt('webshop'));
+        self::assertFalse($webshopOnly->isSpendableAt('centrum'));
+    }
+
     public function test_a_campaign_carries_the_shops_it_runs_at(): void
     {
         $this->fake->queuePage([[
