@@ -20,7 +20,9 @@ use Microsoft\Kiota\Abstractions\Serialization\SerializationWriterFactoryRegistr
 use Microsoft\Kiota\Abstractions\Store\BackingStoreFactory;
 use Psr\Http\Message\StreamInterface;
 use Puntjes\Exception\ConfigurationException;
+use Puntjes\Exception\TransportException;
 use Puntjes\Generated\Security\PublicOperations;
+use Throwable;
 
 /**
  * Kiota's RequestAdapter on Transport: the generated client builds each request, Transport sends it with the
@@ -29,16 +31,18 @@ use Puntjes\Generated\Security\PublicOperations;
  */
 final class Psr18RequestAdapter implements RequestAdapter
 {
+    private const JSON = 'application/json';
+
     public function __construct(private readonly Transport $transport, private string $baseUrl) {}
 
     public function sendAsync(RequestInformation $requestInfo, array $targetCallable, ?array $errorMappings = null): Promise
     {
-        return $this->attempt(fn () => $this->root($this->send($requestInfo))?->getObjectValue($targetCallable));
+        return $this->attempt(fn () => $this->read($this->send($requestInfo), fn (ParseNode $node) => $node->getObjectValue($targetCallable)));
     }
 
     public function sendCollectionAsync(RequestInformation $requestInfo, array $targetCallable, ?array $errorMappings = null): Promise
     {
-        return $this->attempt(fn () => $this->root($this->send($requestInfo))?->getCollectionOfObjectValues($targetCallable));
+        return $this->attempt(fn () => $this->read($this->send($requestInfo), fn (ParseNode $node) => $node->getCollectionOfObjectValues($targetCallable)));
     }
 
     public function sendPrimitiveAsync(RequestInformation $requestInfo, string $primitiveType, ?array $errorMappings = null): Promise
@@ -48,20 +52,19 @@ final class Psr18RequestAdapter implements RequestAdapter
             if ($primitiveType === StreamInterface::class) {
                 return $response->body === '' ? null : Utils::streamFor($response->body);
             }
-            $node = $this->root($response);
 
-            return match ($primitiveType) {
-                'int', 'long' => $node?->getIntegerValue(),
-                'float' => $node?->getFloatValue(),
-                'bool' => $node?->getBooleanValue(),
-                default => $node?->getStringValue(),
-            };
+            return $this->read($response, fn (ParseNode $node) => match ($primitiveType) {
+                'int', 'long' => $node->getIntegerValue(),
+                'float' => $node->getFloatValue(),
+                'bool' => $node->getBooleanValue(),
+                default => $node->getStringValue(),
+            });
         });
     }
 
     public function sendPrimitiveCollectionAsync(RequestInformation $requestInfo, string $primitiveType, ?array $errorMappings = null): Promise
     {
-        return $this->attempt(fn () => $this->root($this->send($requestInfo))?->getCollectionOfPrimitiveValues($primitiveType));
+        return $this->attempt(fn () => $this->read($this->send($requestInfo), fn (ParseNode $node) => $node->getCollectionOfPrimitiveValues($primitiveType)));
     }
 
     public function sendNoContentAsync(RequestInformation $requestInfo, ?array $errorMappings = null): Promise
@@ -129,14 +132,50 @@ final class Psr18RequestAdapter implements RequestAdapter
         return $uri;
     }
 
+    /**
+     * The API answers only JSON; a body with no Content-Type is read as JSON too.
+     * Any other media type, or a body that does not parse, throws TransportException.
+     */
     private function root(Response $response): ?ParseNode
     {
-        $type = $response->header('content-type');
-        if ($response->body === '' || $type === null) {
+        if ($response->body === '') {
             return null;
         }
+        $type = strtolower(trim(explode(';', $response->header('content-type') ?? self::JSON)[0]));
+        if ($type !== self::JSON) {
+            throw $this->unreadable($response);
+        }
+        try {
+            return $this->getParseNodeFactory()->getRootParseNode($type, Utils::streamFor($response->body));
+        } catch (Throwable $e) {
+            throw $this->unreadable($response, $e);
+        }
+    }
 
-        return $this->getParseNodeFactory()->getRootParseNode(explode(';', $type)[0], Utils::streamFor($response->body));
+    /**
+     * @param  callable(ParseNode): mixed  $read
+     */
+    private function read(Response $response, callable $read): mixed
+    {
+        $node = $this->root($response);
+        if ($node === null) {
+            return null;
+        }
+        try {
+            return $read($node);
+        } catch (Throwable $e) {
+            throw $this->unreadable($response, $e);
+        }
+    }
+
+    private function unreadable(Response $response, ?Throwable $previous = null): TransportException
+    {
+        return new TransportException(sprintf(
+            'Expected a JSON response from the Puntjes API but got %s (HTTP %d): %s',
+            $response->header('content-type') ?? 'no content type',
+            $response->status,
+            $response->bodyExcerpt(),
+        ), 0, $previous);
     }
 
     /**

@@ -168,6 +168,10 @@ try {
 | `TransportException` | No HTTP answer at all, or a body that is not JSON |
 | `ConfigurationException` | Bad settings, found before any request |
 
+The API answers in JSON only. A success answer with another `Content-Type`, or with JSON
+that does not parse, throws `TransportException`. An answer with no `Content-Type` is read
+as JSON.
+
 A 422 can be a bad field or a business refusal like `INSUFFICIENT_BALANCE`. Only the bad
 field is a `ValidationException`, so catching it never hides a refusal you need to handle.
 

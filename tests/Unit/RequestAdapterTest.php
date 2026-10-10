@@ -7,6 +7,7 @@ namespace Puntjes\Tests\Unit;
 use Puntjes\Exception\ConfigurationException;
 use Puntjes\Exception\NotFoundException;
 use Puntjes\Exception\RateLimitException;
+use Puntjes\Exception\TransportException;
 use Puntjes\Generated\Errors\ErrorCode;
 use Puntjes\Generated\Models\CreateTransactionData;
 use Puntjes\Generated\Models\SendLoyaltyCardRequestData;
@@ -103,5 +104,47 @@ final class RequestAdapterTest extends TestCase
         }
 
         self::assertSame(0, $this->fake->requestCount());
+    }
+
+    public function test_a_2xx_html_page_throws_a_transport_exception(): void
+    {
+        $this->fake->queueRaw(200, '<html>Login</html>', ['Content-Type' => 'text/html; charset=utf-8']);
+
+        $this->expectException(TransportException::class);
+        $this->expectExceptionMessage('<html>Login</html>');
+
+        $this->puntjes()->me()->get()->wait();
+    }
+
+    public function test_a_2xx_with_broken_json_throws_a_transport_exception(): void
+    {
+        $this->fake->queueRaw(200, '{"data": {', ['Content-Type' => 'application/json']);
+
+        $this->expectException(TransportException::class);
+
+        $this->puntjes()->me()->get()->wait();
+    }
+
+    public function test_the_media_type_is_read_without_case_or_spaces(): void
+    {
+        $this->fake->queueRaw(200, '{"data": {"external_id": "SKU-1", "name": "Koffie"}}', ['Content-Type' => ' Application/JSON ; charset=utf-8']);
+
+        self::assertSame('Koffie', $this->puntjes()->products()->byExternalId('SKU-1')->get()->wait()?->getData()?->getName());
+    }
+
+    public function test_a_json_body_with_no_content_type_is_read_as_json(): void
+    {
+        $this->fake->queueRaw(200, '{"data": {"external_id": "SKU-1", "name": "Koffie"}}');
+
+        self::assertSame('Koffie', $this->puntjes()->products()->byExternalId('SKU-1')->get()->wait()?->getData()?->getName());
+    }
+
+    public function test_a_non_json_body_with_no_content_type_throws_a_transport_exception(): void
+    {
+        $this->fake->queueRaw(200, 'Service Unavailable');
+
+        $this->expectException(TransportException::class);
+
+        $this->puntjes()->me()->get()->wait();
     }
 }
