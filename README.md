@@ -248,13 +248,17 @@ log the secret.
 
 ## Rate limits
 
-A limit belongs to one OAuth client (not one IP) and follows the shop's plan: 60 requests a
-minute on the free plan. Servers that share one client share one limit. Past the limit the
-SDK waits and retries up to `maxRetries`, then throws `RateLimitException`.
+The limit belongs to the shop, and its size follows the shop's plan. Plans can differ, so
+this README gives no number. Every API client and every server of one shop share the same
+limit. A shop that may not use the API is limited per IP address instead.
+
+When the API answers `429 RATE_LIMITED`, the SDK waits for the `Retry-After` time (or backs off when there is none) and tries
+again, up to `maxRetries`, and then throws `RateLimitException`. It does this only for a call
+that is safe to repeat (see [Retries and idempotency](#retries-and-idempotency)).
 
 ## Changing the secret without downtime
 
-A shop can have up to 10 active API clients, so no maintenance window is needed:
+A shop can have more than one active API client, so no maintenance window is needed:
 
 1. Create a new API client in the portal.
 2. Deploy the new credentials.
