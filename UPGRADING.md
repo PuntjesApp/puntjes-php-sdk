@@ -10,7 +10,11 @@ This guide shows what changed and how to write each 1.x call in 2.0.
 
 - **The client is generated.** `Puntjes::make()` returns a `Puntjes\Generated\PuntjesClient`.
   You walk the URL with methods (`->customers()->byCustomer('42')->wallet()`), then call
-  the HTTP method (`->get()`).
+  the HTTP method (`->get()`). A type hint on `Puntjes\Puntjes` (a property, an argument,
+  a container binding) becomes `Puntjes\Generated\PuntjesClient`.
+- **Pass query values by name.** `createQueryParameters()` takes its arguments in
+  alphabetical order. A new query value in a later release moves the others, so write
+  `createQueryParameters(identifier: $card)`, never a call by position.
 - **Every call returns a promise.** End it with `->wait()`. The answer has a `getData()`
   method for the `data` part of the JSON.
 - **Models are generated.** `Puntjes\Model\*`, `Puntjes\Request\*` and `Puntjes\Enum\*` are
@@ -167,12 +171,13 @@ use Puntjes\Generated\Errors\ErrorCode;
 Nothing else changes: `ApiException::status()`, `code()`, `requestId()`, `is()`,
 `ValidationException::errorsFor()` and `RateLimitException::retryAfter()` work as in 1.x.
 
-## Two new packages
+## New packages
 
-`composer require puntjes/php-sdk:^2.0` also installs `open-telemetry/sdk` and
-`doctrine/annotations`. Both come from `microsoft/kiota-abstractions`, which the generated
-client needs. The SDK does not use them directly. If your build scopes or prefixes its
-vendor files (for example a WordPress plugin), add them to the list.
+`composer require puntjes/php-sdk:^2.0` also installs the Kiota packages and what they need,
+such as `open-telemetry/sdk`, `doctrine/annotations`, `ramsey/uuid` and `brick/math`. The
+generated client needs Kiota. The SDK does not use the others directly. If your build scopes
+or prefixes its vendor files (for example a WordPress plugin), add all of them to the list.
+The README section "WordPress / WooCommerce" has the full list.
 
 ## The 1.x line
 

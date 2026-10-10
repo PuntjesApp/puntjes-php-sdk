@@ -70,6 +70,10 @@ $customer = $puntjes->customers()->lookup()->get(new Lookup(
 echo $customer->getWalletBalance();
 ```
 
+Pass query values to `createQueryParameters()` by name, as above. The generated method
+takes its arguments in alphabetical order, so a new query value in a later release moves
+the others, and a call by position then sends the wrong value.
+
 `Puntjes::make()` takes `baseUrl` (default `https://puntjes.app`; the API docs form
 `https://puntjes.app/api/v1` works too), `tokenStore`, `httpClient`, `requestFactory`,
 `streamFactory`, `maxRetries`, `defaultHeaders` and `sleeper`.
@@ -227,9 +231,21 @@ Two things matter when you ship this inside a plugin.
 plugins bundle different versions of one library, one of them breaks. Run
 [PHP-Scoper](https://github.com/humbug/php-scoper) or
 [Strauss](https://github.com/BrianHenryIE/strauss) over your vendor folder before you
-distribute it. This SDK needs the PSR interfaces, `php-http/discovery` and the Kiota
-packages (`microsoft/kiota-*`, with `open-telemetry/sdk` and `doctrine/annotations` behind
-them).
+distribute it. Scope every package this SDK installs. On PHP 8.4 with the newest versions
+that is:
+
+- `guzzlehttp/psr7`, `ralouphie/getallheaders`, `php-http/discovery`, `php-http/promise`
+  and the `psr/*` interfaces (`psr/http-client`, `psr/http-factory`, `psr/http-message`,
+  `psr/cache`, `psr/log`)
+- the Kiota packages (`microsoft/kiota-abstractions`, `microsoft/kiota-serialization-json`,
+  `microsoft/kiota-serialization-text`) and `stduritemplate/stduritemplate`
+- what Kiota needs: `open-telemetry/api`, `open-telemetry/context`, `open-telemetry/sdk`,
+  `open-telemetry/sem-conv`, `tbachert/spi`, `nyholm/psr7-server`, `composer/semver`,
+  `doctrine/annotations`, `doctrine/lexer`, `ramsey/uuid`, `ramsey/collection` and
+  `brick/math`
+- the Symfony polyfills (`symfony/deprecation-contracts`, `symfony/polyfill-*`)
+
+Run `composer show --no-dev` in your plugin to see the exact list for your PHP version.
 
 **2. Cache tokens in a transient.** Without it, every page load asks for a new token:
 
