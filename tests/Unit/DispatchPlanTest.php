@@ -28,7 +28,7 @@ final class DispatchPlanTest extends TestCase
         [$exit, $plan] = $this->plan('v1.1.0', 'minor', self::URL, 'main@abc1234');
 
         self::assertSame(0, $exit);
-        self::assertSame(['skip' => 'false', 'commit_type' => 'feat', 'auto_merge' => 'true', 'branch' => 'regenerate/v1.1.0'], $plan);
+        self::assertSame(['skip' => 'false', 'commit_type' => 'feat', 'auto_merge' => 'true', 'branch' => 'regenerate/v1.1.0', 'close' => ''], $plan);
     }
 
     public function test_a_major_is_breaking_and_waits_for_a_person(): void
@@ -59,5 +59,34 @@ final class DispatchPlanTest extends TestCase
     {
         self::assertSame(1, $this->plan('v1.1.0', 'huge', self::URL, 'x')[0]);
         self::assertSame(1, $this->plan('v1.1.0;rm', 'minor', self::URL, 'x')[0]);
+    }
+
+    public function test_a_source_tag_newer_than_the_tag_is_skipped(): void
+    {
+        self::assertSame('true', $this->plan('v1.1.0', 'minor', self::URL, 'v1.2.0')[1]['skip']);
+    }
+
+    public function test_a_source_tag_older_than_the_tag_is_regenerated_by_version_not_by_text(): void
+    {
+        $url = 'https://raw.githubusercontent.com/PuntjesApp/puntjes-openapi/v1.10.0/api.json';
+
+        self::assertSame('false', $this->plan('v1.10.0', 'minor', $url, 'v1.9.0')[1]['skip']);
+        self::assertSame('true', $this->plan('v1.9.0', 'minor', str_replace('v1.10.0', 'v1.9.0', $url), 'v1.10.0')[1]['skip']);
+    }
+
+    public function test_an_open_regenerate_pr_for_a_newer_tag_skips_the_older_tag(): void
+    {
+        [, $plan] = $this->plan('v1.1.0', 'minor', self::URL, 'main@abc1234', "regenerate/v1.0.0\nregenerate/v1.2.0");
+
+        self::assertSame('true', $plan['skip']);
+        self::assertSame('', $plan['close']);
+    }
+
+    public function test_the_open_regenerate_prs_for_older_tags_are_closed(): void
+    {
+        [, $plan] = $this->plan('v1.1.0', 'minor', self::URL, 'v1.0.0', "regenerate/v1.0.1\nregenerate/v1.1.0\nfeature/x\nregenerate/v0.9.0\nregenerate/v1.0.2;rm");
+
+        self::assertSame('false', $plan['skip']);
+        self::assertSame('regenerate/v1.0.1 regenerate/v0.9.0', $plan['close']);
     }
 }

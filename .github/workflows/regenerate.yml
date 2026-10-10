@@ -32,10 +32,17 @@ jobs:
       - name: Plan
         id: plan
         env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
           TAG: ${{ github.event.client_payload.tag }}
           LEVEL: ${{ github.event.client_payload.level }}
           URL: ${{ github.event.client_payload.url }}
-        run: php scripts/dispatch-plan.php "$TAG" "$LEVEL" "$URL" "$(cat spec/SOURCE)" >> "$GITHUB_OUTPUT"
+        run: |
+          open=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 200 --json headRefName \
+            --jq '.[].headRefName | select(startswith("regenerate/"))')
+          php scripts/dispatch-plan.php "$TAG" "$LEVEL" "$URL" "$(cat spec/SOURCE)" "$open" >> "$GITHUB_OUTPUT"
+      - name: Say why the dispatch is skipped
+        if: steps.plan.outputs.skip == 'true'
+        run: echo "::notice::spec/SOURCE or an open regenerate PR already has this tag or a newer one."
       - name: Find out how far an earlier run got
         id: state
         if: steps.plan.outputs.skip == 'false'
@@ -70,6 +77,17 @@ jobs:
           git add spec src/Generated
           git commit -m "${TYPE}: regenerate from puntjes-openapi ${TAG}"
           git push origin "$BRANCH"
+      - name: Close the open PRs for older tags
+        if: (steps.state.outputs.stage == 'fresh' || steps.state.outputs.stage == 'resume') && steps.plan.outputs.close != ''
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          TAG: ${{ github.event.client_payload.tag }}
+          CLOSE: ${{ steps.plan.outputs.close }}
+        run: |
+          for branch in $CLOSE; do
+            gh pr close "$branch" --repo "$GITHUB_REPOSITORY" --delete-branch \
+              --comment "The spec ${TAG} replaces this one. Its regenerate PR holds every change of this PR."
+          done
       - name: Open the PR
         if: steps.state.outputs.stage == 'fresh' || steps.state.outputs.stage == 'resume'
         env:
