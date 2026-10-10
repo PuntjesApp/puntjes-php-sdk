@@ -42,7 +42,8 @@
         }
     },
     "scripts": {
-        "test": "phpunit",
+        "test": "phpunit --testsuite Unit",
+        "test:contract": "phpunit --testsuite Contract",
         "analyse": "phpstan analyse",
         "format": "pint"
     },
