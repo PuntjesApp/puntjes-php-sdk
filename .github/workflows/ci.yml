@@ -77,7 +77,9 @@ jobs:
         run: sh scripts/generate.sh
 
       - name: Fail on any difference
-        run: git diff --exit-code -- src/Generated
+        run: |
+          git status --porcelain -- src/Generated
+          test -z "$(git status --porcelain -- src/Generated)"
 
   # The one check branch protection requires, so a change to the matrix never edits the protection.
   ci:
