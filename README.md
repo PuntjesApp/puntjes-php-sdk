@@ -351,6 +351,20 @@ raises the patch number, a `feat:` raises the minor number, and a `feat!:` or a
 
 Write commit titles in the conventional form, because they become the changelog.
 
+A new Puntjes API spec reaches this repository as a regenerate pull request. The
+`Regenerate` workflow opens it on the branch `regenerate/<tag>` and closes the open ones for
+older tags. A minor or patch one merges itself when CI is green. A major one asks
+`@cedricdhooge96` for a review and waits.
+
+Three cases need a person:
+
+- **The workflow fails.** It opens the issue "Regenerate failed", or comments on it when it
+  is open. Read the run, fix the cause, and re-run it. The re-run picks up where the run
+  stopped.
+- **A regenerate pull request has red CI.** It stays open and does not merge. No issue
+  tells you, so check the open `regenerate/*` pull requests after each Puntjes release.
+- **A major regenerate pull request waits for its review.**
+
 ## Versions
 
 2.x is the current line. 1.x gets security fixes for 6 months after 2.0.0 reaches Packagist,

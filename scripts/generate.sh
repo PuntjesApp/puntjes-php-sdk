@@ -3,6 +3,7 @@
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
 image="mcr.microsoft.com/openapi/kiota@sha256:ec6d326a8f98a067106729903928535906044aa1a42dbd1825c384080da76b13"
+php="php:8.4-cli@sha256:1d2cf2b7d715b5b3aa959f0150ccbcc7b71e0181b637e443abf40a7fb56bf79a"
 rm -rf "$root/src/Generated"
 docker run --rm -u "$(id -u):$(id -g)" -v "$root:/w" "$image" generate \
   -l PHP -d /w/spec/api.json -o /w/src/Generated -n 'Puntjes\Generated' -c PuntjesClient \
@@ -18,8 +19,8 @@ grep -rl '@QueryParameter' "$root/src/Generated" | while read -r file; do
 done
 rm -f "$root/src/Generated/kiota-lock.json"
 mkdir -p "$root/src/Generated/Errors"
-docker run --rm -u "$(id -u):$(id -g)" -v "$root:/app" -w /app php:8.4-cli \
+docker run --rm -u "$(id -u):$(id -g)" -v "$root:/app" -w /app "$php" \
   php scripts/error-codes.php spec/api.json src/Generated/Errors/ErrorCode.php
 mkdir -p "$root/src/Generated/Security"
-docker run --rm -u "$(id -u):$(id -g)" -v "$root:/app" -w /app php:8.4-cli \
+docker run --rm -u "$(id -u):$(id -g)" -v "$root:/app" -w /app "$php" \
   php scripts/public-operations.php spec/api.json src/Generated/Security/PublicOperations.php
