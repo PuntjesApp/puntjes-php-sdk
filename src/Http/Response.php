@@ -38,11 +38,6 @@ final class Response
         return $this->status >= 200 && $this->status < 300;
     }
 
-    public function wasCreated(): bool
-    {
-        return $this->status === 201;
-    }
-
     /**
      * The decoded JSON body.
      *
@@ -86,47 +81,6 @@ final class Response
         $decoded = json_decode($this->body, true);
 
         return $this->decoded = is_array($decoded) ? $decoded : null;
-    }
-
-    /**
-     * The payload inside the `{"data": …}` success envelope.
-     *
-     * Every successful JSON response from the API is wrapped this way, so a body
-     * without it means the SDK is talking to something that is not the Puntjes API
-     * (a proxy error page, a login redirect, a wrong base URL).
-     */
-    public function data(): mixed
-    {
-        $json = $this->json();
-
-        if (! array_key_exists('data', $json)) {
-            throw new TransportException(sprintf(
-                'The Puntjes API response (HTTP %d) had no "data" envelope: %s',
-                $this->status,
-                $this->bodyExcerpt(),
-            ));
-        }
-
-        return $json['data'];
-    }
-
-    /**
-     * The `data` payload as an array.
-     *
-     * @return array<array-key, mixed>
-     */
-    public function dataArray(): array
-    {
-        $data = $this->data();
-
-        if (! is_array($data)) {
-            throw new TransportException(sprintf(
-                'Expected the Puntjes API "data" envelope to hold an object or list, got %s.',
-                get_debug_type($data),
-            ));
-        }
-
-        return $data;
     }
 
     /** First 200 characters of the body, for error messages. */

@@ -75,60 +75,6 @@ final class Transport
         };
     }
 
-    /** @param array<string, mixed> $query */
-    public function get(string $path, array $query = []): Response
-    {
-        return $this->request('GET', $path, $query);
-    }
-
-    /**
-     * @param  array<string, mixed>  $body
-     * @param  array<string, mixed>  $query
-     */
-    public function post(string $path, array $body = [], array $query = []): Response
-    {
-        return $this->request('POST', $path, $query, $body);
-    }
-
-    /** @param array<string, mixed> $body */
-    public function put(string $path, array $body = []): Response
-    {
-        return $this->request('PUT', $path, [], $body);
-    }
-
-    /** @param array<string, mixed> $body */
-    public function patch(string $path, array $body = []): Response
-    {
-        return $this->request('PATCH', $path, [], $body);
-    }
-
-    public function delete(string $path): Response
-    {
-        return $this->request('DELETE', $path);
-    }
-
-    /**
-     * Send an authenticated API request.
-     *
-     * @param  array<string, mixed>  $query
-     * @param  array<string, mixed>|null  $body  Encoded as JSON when present.
-     * @param  array<string, string>  $headers
-     *
-     * @throws ApiException|TransportException
-     */
-    public function request(
-        string $method,
-        string $path,
-        array $query = [],
-        ?array $body = null,
-        array $headers = [],
-    ): Response {
-        $method = strtoupper($method);
-        $encodedBody = $body === null ? null : json_encode($body, JSON_THROW_ON_ERROR);
-
-        return $this->send($method, $this->config->apiUrl($path), $query, $encodedBody, self::isRetryable($method, $body), $headers, true);
-    }
-
     /**
      * Sends a request built elsewhere, the generated client's, under the same token, retry and error rules.
      *
@@ -142,14 +88,11 @@ final class Transport
         $method = strtoupper($method);
         $decoded = $body === null || $body === '' ? null : json_decode($body, true);
 
-        return $this->send($method, $url, [], $body === '' ? null : $body, self::isRetryable($method, is_array($decoded) ? $decoded : null), $headers, $authenticate);
+        return $this->send($method, $url, $body === '' ? null : $body, self::isRetryable($method, is_array($decoded) ? $decoded : null), $headers, $authenticate);
     }
 
-    /**
-     * @param  array<string, mixed>  $query
-     * @param  array<string, string>  $headers
-     */
-    private function send(string $method, string $url, array $query, ?string $encodedBody, bool $retryable, array $headers, bool $authenticate): Response
+    /** @param array<string, string> $headers */
+    private function send(string $method, string $url, ?string $encodedBody, bool $retryable, array $headers, bool $authenticate): Response
     {
         $attempt = 0;
         $tokenRefreshed = false;
@@ -184,7 +127,7 @@ final class Transport
             );
 
             try {
-                $response = $this->http->send($method, $url, $query, $requestHeaders, $encodedBody);
+                $response = $this->http->send($method, $url, [], $requestHeaders, $encodedBody);
             } catch (TransportException $e) {
                 // No response at all. Safe to replay only if the call itself is replay-safe:
                 // the request may well have been processed before the connection dropped.
