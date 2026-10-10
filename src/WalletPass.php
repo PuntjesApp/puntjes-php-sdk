@@ -6,6 +6,7 @@ namespace Puntjes;
 
 use Microsoft\Kiota\Abstractions\RequestAdapter;
 use Psr\Http\Message\StreamInterface;
+use Puntjes\Exception\TransportException;
 use Puntjes\Generated\Customers\Item\WalletPass\GetPlatformQueryParameterType;
 use Puntjes\Generated\Customers\Item\WalletPass\WalletPassRequestBuilderGetRequestConfiguration;
 use Puntjes\Generated\PuntjesClient;
@@ -28,7 +29,11 @@ final class WalletPass
         /** @var RequestAdapter $adapter */
         $adapter = (new ReflectionProperty($client, 'requestAdapter'))->getValue($client);
 
-        /** @var StreamInterface */
-        return $adapter->sendPrimitiveAsync($request, StreamInterface::class)->wait();
+        $pass = $adapter->sendPrimitiveAsync($request, StreamInterface::class)->wait();
+        if (! $pass instanceof StreamInterface) {
+            throw new TransportException('The Puntjes API answered the Apple wallet pass request with an empty body.');
+        }
+
+        return $pass;
     }
 }

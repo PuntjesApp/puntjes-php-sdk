@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Puntjes\Tests\Unit;
 
+use Puntjes\Exception\TransportException;
 use Puntjes\Generated\Products\ProductsRequestBuilderGetRequestConfiguration;
 use Puntjes\IdempotencyKey;
 use Puntjes\Pagination\Paginator;
@@ -54,5 +55,14 @@ final class HelpersTest extends TestCase
     {
         self::assertMatchesRegularExpression('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', IdempotencyKey::new());
         self::assertNotSame(IdempotencyKey::new(), IdempotencyKey::new());
+    }
+
+    public function test_an_empty_apple_pass_throws_a_transport_exception(): void
+    {
+        $this->fake->queueRaw(200, '', ['Content-Type' => 'application/vnd.apple.pkpass']);
+
+        $this->expectException(TransportException::class);
+
+        WalletPass::apple($this->puntjes(), 42);
     }
 }
