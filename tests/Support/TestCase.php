@@ -10,7 +10,9 @@ use Puntjes\Auth\ClientCredentialsProvider;
 use Puntjes\Auth\InMemoryTokenStore;
 use Puntjes\Auth\TokenStore;
 use Puntjes\Config;
+use Puntjes\Generated\PuntjesClient;
 use Puntjes\Http\HttpClient;
+use Puntjes\Http\Psr18RequestAdapter;
 use Puntjes\Http\Transport;
 use Puntjes\Puntjes;
 
@@ -63,5 +65,20 @@ abstract class TestCase extends BaseTestCase
         );
 
         return new Puntjes($config, $transport, $http);
+    }
+
+    /** The generated client wired to {@see $fake} through the adapter. Token grants are served automatically. */
+    protected function generated(int $maxRetries = 2, ?TokenStore $store = null): PuntjesClient
+    {
+        $config = $this->config($maxRetries);
+        $http = new HttpClient($this->fake);
+        $transport = new Transport(
+            $config,
+            $http,
+            new ClientCredentialsProvider($config, $http, $store ?? new InMemoryTokenStore),
+            fn (float $s) => $this->sleeps[] = $s,
+        );
+
+        return new PuntjesClient(new Psr18RequestAdapter($transport, rtrim($config->apiUrl(''), '/')));
     }
 }

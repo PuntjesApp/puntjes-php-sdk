@@ -241,6 +241,18 @@ final class FakeHttpClient implements ClientInterface
         ));
     }
 
+    /** The last request that was not a token grant. */
+    public function lastRequest(): RequestInterface
+    {
+        $requests = $this->apiRequests();
+
+        if ($requests === []) {
+            throw new RuntimeException('No API request was sent.');
+        }
+
+        return $requests[count($requests) - 1];
+    }
+
     public function apiRequestCount(): int
     {
         return count($this->apiRequests());
