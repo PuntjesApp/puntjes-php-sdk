@@ -20,3 +20,6 @@ rm -f "$root/src/Generated/kiota-lock.json"
 mkdir -p "$root/src/Generated/Errors"
 docker run --rm -u "$(id -u):$(id -g)" -v "$root:/app" -w /app php:8.4-cli \
   php scripts/error-codes.php spec/api.json src/Generated/Errors/ErrorCode.php
+mkdir -p "$root/src/Generated/Security"
+docker run --rm -u "$(id -u):$(id -g)" -v "$root:/app" -w /app php:8.4-cli \
+  php scripts/public-operations.php spec/api.json src/Generated/Security/PublicOperations.php

@@ -155,6 +155,16 @@ final class AuthenticationTest extends TestCase
         self::assertNotSame($a->credentialFingerprint(), $b->credentialFingerprint());
     }
 
+    public function test_the_health_check_needs_no_token(): void
+    {
+        $this->fake->queueData(['status' => 'ok']);
+
+        self::assertSame('ok', $this->puntjes()->health()->get()->wait()?->getData()?->getStatus());
+        self::assertSame(1, $this->fake->requestCount());
+        self::assertSame('/api/v1/health', $this->fake->requestAt(0)->getUri()->getPath());
+        self::assertFalse($this->fake->requestAt(0)->hasHeader('Authorization'));
+    }
+
     public function test_a_transient_grant_failure_is_retried_under_the_normal_policy(): void
     {
         $this->fake->queueTokenFailure(500, [

@@ -20,6 +20,7 @@ use Microsoft\Kiota\Abstractions\Serialization\SerializationWriterFactoryRegistr
 use Microsoft\Kiota\Abstractions\Store\BackingStoreFactory;
 use Psr\Http\Message\StreamInterface;
 use Puntjes\Exception\ConfigurationException;
+use Puntjes\Generated\Security\PublicOperations;
 
 /**
  * Kiota's RequestAdapter on Transport: the generated client builds each request, Transport sends it with the
@@ -111,8 +112,10 @@ final class Psr18RequestAdapter implements RequestAdapter
             $headers[$name] = implode(', ', $values);
         }
         $body = $info->content === null ? null : (string) $info->content;
+        $uri = $this->uri($info);
+        $path = (string) parse_url(substr($uri, strlen($this->baseUrl)), PHP_URL_PATH);
 
-        return $this->transport->sendRaw($info->httpMethod, $this->uri($info), $headers, $body);
+        return $this->transport->sendRaw($info->httpMethod, $uri, $headers, $body, ! PublicOperations::matches($info->httpMethod, $path));
     }
 
     private function uri(RequestInformation $info): string

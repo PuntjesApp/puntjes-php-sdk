@@ -1,0 +1,4 @@
+{"security":[{"oauth2":[]}],
+ "paths":{"/health":{"get":{"security":[]}},
+          "/customers/{customer}/wallet":{"get":{},"post":{"security":[]}},
+          "/me":{"get":{"security":[{"oauth2":[]}]}}}}

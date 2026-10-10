@@ -6,6 +6,7 @@ namespace Puntjes\Tests\Unit;
 
 use Puntjes\Auth\ClientCredentialsProvider;
 use Puntjes\Auth\InMemoryTokenStore;
+use Puntjes\Exception\AuthenticationException;
 use Puntjes\Exception\ServerException;
 use Puntjes\Http\HttpClient;
 use Puntjes\Http\Transport;
@@ -55,5 +56,31 @@ final class TransportRawTest extends TestCase
 
         $request = $this->fake->requestsTo('/api/v1/products/A')[0];
         self::assertSame(['application/x-test'], $request->getHeader('Content-Type'));
+    }
+
+    public function test_an_unauthenticated_call_maps_a_401_without_a_grant(): void
+    {
+        $this->fake->queueJson(401, ['error' => ['code' => 'UNAUTHENTICATED', 'message' => 'x']]);
+
+        $this->expectException(AuthenticationException::class);
+
+        try {
+            $this->transport()->sendRaw('GET', 'https://app.puntjes.test/api/v1/health', [], null, authenticate: false);
+        } finally {
+            self::assertSame(1, $this->fake->requestCount());
+            self::assertFalse($this->fake->requestAt(0)->hasHeader('Authorization'));
+        }
+    }
+
+    public function test_an_unauthenticated_call_keeps_the_retry_rule(): void
+    {
+        $this->fake->queueJson(503, ['error' => ['code' => 'INTERNAL_ERROR', 'message' => 'x']]);
+        $this->fake->queueData(['status' => 'ok']);
+
+        $response = $this->transport()->sendRaw('GET', 'https://app.puntjes.test/api/v1/health', [], null, authenticate: false);
+
+        self::assertSame(200, $response->status);
+        self::assertSame(2, $this->fake->requestCount());
+        self::assertSame([0.5], $this->sleeps);
     }
 }
