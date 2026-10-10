@@ -5,7 +5,7 @@ Notable changes to `puntjes/php-sdk`. The format follows
 [semantic versioning](https://semver.org/). From 1.0.0 that promise is the ordinary one:
 a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 
-## Unreleased
+## 1.7.0 — 2026-10-10
 
 Follows PuntjesApp/Puntjes#1168 and PuntjesApp/Puntjes#1089. Additive: code that works with 1.6.0 keeps
 working. `Vouchers::forCustomer()` needs a Puntjes with #1089 deployed; an older one answers it with a 404.
