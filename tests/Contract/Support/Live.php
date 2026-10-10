@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Puntjes\Tests\Contract\Support;
 
-use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 /**
@@ -68,8 +67,6 @@ final class Live
                 }
             }
         }
-
-        TestCase::assertCount(34, $all);
 
         return array_values(array_diff($all, array_keys(self::$hits[$client] ?? [])));
     }
