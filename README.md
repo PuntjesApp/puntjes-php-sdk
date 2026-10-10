@@ -74,6 +74,19 @@ echo $customer->getWalletBalance();
 `https://puntjes.app/api/v1` works too), `tokenStore`, `httpClient`, `requestFactory`,
 `streamFactory`, `maxRetries`, `defaultHeaders` and `sleeper`.
 
+## Clearing a field
+
+A setter with null does not clear a field: the client leaves a null value out of the
+request body. To clear a field in a PATCH (`UpdateCustomerData`, `UpdateProductData`), put
+the null in the additional data:
+
+```php
+use Puntjes\Generated\Models\UpdateCustomerData;
+
+$body = new UpdateCustomerData();
+$body->setAdditionalData(['phone' => null]);   // sends {"phone": null}
+```
+
 ## Amounts are in cents
 
 Every money value on this API is a whole number of cents. 42.00 euro is `4200`.

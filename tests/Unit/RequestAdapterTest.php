@@ -11,6 +11,8 @@ use Puntjes\Exception\TransportException;
 use Puntjes\Generated\Errors\ErrorCode;
 use Puntjes\Generated\Models\CreateTransactionData;
 use Puntjes\Generated\Models\SendLoyaltyCardRequestData;
+use Puntjes\Generated\Models\UpdateCustomerData;
+use Puntjes\Generated\Models\UpdateProductData;
 use Puntjes\Tests\Support\TestCase;
 
 final class RequestAdapterTest extends TestCase
@@ -146,5 +148,33 @@ final class RequestAdapterTest extends TestCase
         $this->expectException(TransportException::class);
 
         $this->puntjes()->me()->get()->wait();
+    }
+
+    public function test_a_null_setter_sends_nothing_and_a_null_in_additional_data_clears_the_field(): void
+    {
+        $this->fake->queueData(['id' => 5]);
+        $this->fake->queueData(['id' => 5]);
+        $body = new UpdateCustomerData;
+        $body->setFirstName('A');
+        $body->setPhone(null);
+        $client = $this->puntjes();
+
+        $client->customers()->byExternalId()->byExternalId('C-1')->patch($body)->wait();
+        self::assertSame('{"first_name":"A"}', (string) $this->fake->lastRequest()->getBody());
+
+        $body->setAdditionalData(['phone' => null]);
+        $client->customers()->byExternalId()->byExternalId('C-1')->patch($body)->wait();
+        self::assertSame('{"first_name":"A","phone":null}', (string) $this->fake->lastRequest()->getBody());
+    }
+
+    public function test_a_null_in_additional_data_clears_a_product_field(): void
+    {
+        $this->fake->queueData(['external_id' => 'SKU-1', 'name' => 'Koffie']);
+        $body = new UpdateProductData;
+        $body->setAdditionalData(['description' => null]);
+
+        $this->puntjes()->products()->byExternalId('SKU-1')->patch($body)->wait();
+
+        self::assertSame('{"description":null}', (string) $this->fake->lastRequest()->getBody());
     }
 }

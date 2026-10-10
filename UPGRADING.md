@@ -22,7 +22,7 @@ This guide shows what changed and how to write each 1.x call in 2.0.
 - **Helpers.** `Puntjes\IdempotencyKey::new()`, `Puntjes\Pagination\Paginator::of()` and
   `Puntjes\WalletPass::apple()` cover the three things the generated client does not.
 
-## Four behaviours to know
+## Five behaviours to know
 
 1. **The SDK no longer makes an `idempotency_key` for you.** In 1.x the resources added one
    inside the SDK. In 2.0 you pass one: `$body->setIdempotencyKey(IdempotencyKey::new())`.
@@ -35,6 +35,13 @@ This guide shows what changed and how to write each 1.x call in 2.0.
    operation the spec marks as public.
 4. **Iterate pages with `Paginator::of()`.** The `Paginator` class of 1.x (with `firstPage()`
    and `all()`) is gone. See the example below.
+5. **A setter with null does not clear a field.** The generated models leave a null value
+   out of the request body, so `$body->setPhone(null)` sends nothing for `phone`. In 1.x,
+   `new UpdateCustomer(phone: null)` cleared the phone number. To clear a field in a PATCH of
+   `UpdateCustomerData` or `UpdateProductData`, put the null in the additional data:
+   `$body->setAdditionalData(['phone' => null])` sends `"phone": null`. Check this in code
+   that removes personal data on request, because there a field that stays filled is a
+   GDPR problem.
 
 ## Setting up
 
