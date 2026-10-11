@@ -32,7 +32,7 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
       - name: Let the release PR merge itself when CI is green
-        if: steps.release.outputs.pr != ''
+        if: steps.release.outputs.pr
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           PR: ${{ fromJSON(steps.release.outputs.pr).number }}
