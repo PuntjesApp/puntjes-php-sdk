@@ -177,4 +177,11 @@ final class RequestAdapterTest extends TestCase
 
         self::assertSame('{"description":null}', (string) $this->fake->lastRequest()->getBody());
     }
+
+    public function test_a_body_of_only_whitespace_reads_as_no_body(): void
+    {
+        $this->fake->queueRaw(200, "\n", ['Content-Type' => 'text/html']);
+
+        self::assertNull($this->puntjes()->me()->get()->wait());
+    }
 }

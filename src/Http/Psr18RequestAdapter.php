@@ -138,7 +138,7 @@ final class Psr18RequestAdapter implements RequestAdapter
      */
     private function root(Response $response): ?ParseNode
     {
-        if ($response->body === '') {
+        if (trim($response->body) === '') {
             return null;
         }
         $type = strtolower(trim(explode(';', $response->header('content-type') ?? self::JSON)[0]));
