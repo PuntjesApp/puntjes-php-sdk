@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Puntjes\Exception;
 
 /**
- * 429 RATE_LIMITED — the per-OAuth-client request budget for this minute is spent.
+ * 429 RATE_LIMITED: the shop's request budget for this minute is spent.
  *
- * The limit is plan-derived (60/min on the free tier) and keyed on the OAuth client,
- * not the IP, so several servers sharing one client share one budget.
+ * The limit belongs to the shop and follows its plan, so every API client and server
+ * of one shop share one budget.
  *
  * Deliberately NOT raised for the other 429 the API emits, PLAN_LIMIT_EXCEEDED —
  * see {@see PlanLimitExceededException}. Waiting helps here; it does not there.

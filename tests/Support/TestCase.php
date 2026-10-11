@@ -4,14 +4,10 @@ declare(strict_types=1);
 
 namespace Puntjes\Tests\Support;
 
-use Nyholm\Psr7\Factory\Psr17Factory;
 use PHPUnit\Framework\TestCase as BaseTestCase;
-use Puntjes\Auth\ClientCredentialsProvider;
-use Puntjes\Auth\InMemoryTokenStore;
 use Puntjes\Auth\TokenStore;
 use Puntjes\Config;
-use Puntjes\Http\HttpClient;
-use Puntjes\Http\Transport;
+use Puntjes\Generated\PuntjesClient;
 use Puntjes\Puntjes;
 
 abstract class TestCase extends BaseTestCase
@@ -44,24 +40,19 @@ abstract class TestCase extends BaseTestCase
         );
     }
 
-    /** A client wired to {@see $fake}. Token grants are served automatically. */
-    protected function puntjes(int $maxRetries = 2, ?TokenStore $store = null): Puntjes
+    /** The 2.0 client from {@see Puntjes::make()}, wired to {@see $fake}. Token grants are served automatically. */
+    protected function puntjes(int $maxRetries = 2, ?TokenStore $store = null): PuntjesClient
     {
-        $config = $this->config($maxRetries);
-        $psr17 = new Psr17Factory;
-        $http = new HttpClient($this->fake, $psr17, $psr17);
-
-        $provider = new ClientCredentialsProvider($config, $http, $store ?? new InMemoryTokenStore);
-
-        $transport = new Transport(
-            $config,
-            $http,
-            $provider,
-            function (float $seconds): void {
+        return Puntjes::make(
+            'test-client',
+            'test-secret',
+            'https://app.puntjes.test',
+            tokenStore: $store,
+            httpClient: $this->fake,
+            maxRetries: $maxRetries,
+            sleeper: function (float $seconds): void {
                 $this->sleeps[] = $seconds;
             },
         );
-
-        return new Puntjes($config, $transport, $http);
     }
 }

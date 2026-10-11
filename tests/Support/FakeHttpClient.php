@@ -228,6 +228,31 @@ final class FakeHttpClient implements ClientInterface
         ));
     }
 
+    /**
+     * API requests whose URI path equals $path, in order.
+     *
+     * @return array<int, RequestInterface>
+     */
+    public function requestsTo(string $path): array
+    {
+        return array_values(array_filter(
+            $this->apiRequests(),
+            static fn (RequestInterface $r): bool => $r->getUri()->getPath() === $path,
+        ));
+    }
+
+    /** The last request that was not a token grant. */
+    public function lastRequest(): RequestInterface
+    {
+        $requests = $this->apiRequests();
+
+        if ($requests === []) {
+            throw new RuntimeException('No API request was sent.');
+        }
+
+        return $requests[count($requests) - 1];
+    }
+
     public function apiRequestCount(): int
     {
         return count($this->apiRequests());

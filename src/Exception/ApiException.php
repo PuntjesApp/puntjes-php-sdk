@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Puntjes\Exception;
 
-use Puntjes\Enum\ErrorCode;
+use Puntjes\Generated\Errors\ErrorCode;
 
 /**
  * The API answered with an error envelope:

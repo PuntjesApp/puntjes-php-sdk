@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Puntjes\Tests\Unit;
 
-use Puntjes\Enum\ErrorCode;
 use Puntjes\Exception\ApiException;
 use Puntjes\Exception\AuthenticationException;
 use Puntjes\Exception\ConflictException;
@@ -15,8 +14,9 @@ use Puntjes\Exception\RateLimitException;
 use Puntjes\Exception\ServerException;
 use Puntjes\Exception\TransportException;
 use Puntjes\Exception\ValidationException;
-use Puntjes\Request\ProductFilters;
-use Puntjes\Request\UpsertProduct;
+use Puntjes\Generated\Errors\ErrorCode;
+use Puntjes\Generated\Models\UpsertProductData;
+use Puntjes\Generated\Products\ProductsRequestBuilderGetRequestConfiguration;
 use Puntjes\Tests\Support\TestCase;
 
 final class ErrorMappingTest extends TestCase
@@ -61,7 +61,7 @@ final class ErrorMappingTest extends TestCase
         $puntjes = $this->puntjes(maxRetries: 0);
 
         try {
-            $puntjes->me();
+            $puntjes->me()->get()->wait();
             self::fail("Expected {$expected}.");
         } catch (ApiException $e) {
             self::assertSame($expected, $e::class);
@@ -79,7 +79,7 @@ final class ErrorMappingTest extends TestCase
         $this->fake->queueError(400, 'INVALID_JSON', 'The request body is not valid JSON.');
 
         try {
-            $this->puntjes()->products->upsert('SKU-1', new UpsertProduct(name: 'Brood'));
+            $this->puntjes()->products()->byExternalId('SKU-1')->put(self::product('Brood'))->wait();
             self::fail('Expected an ApiException.');
         } catch (ApiException $e) {
             self::assertSame(ApiException::class, $e::class);
@@ -99,7 +99,7 @@ final class ErrorMappingTest extends TestCase
         $this->fake->queueError(415, 'UNSUPPORTED_MEDIA_TYPE', 'The request body must be JSON.');
 
         try {
-            $this->puntjes()->products->upsert('SKU-1', new UpsertProduct(name: 'Brood'));
+            $this->puntjes()->products()->byExternalId('SKU-1')->put(self::product('Brood'))->wait();
             self::fail('Expected an ApiException.');
         } catch (ApiException $e) {
             self::assertSame(ApiException::class, $e::class);
@@ -120,7 +120,9 @@ final class ErrorMappingTest extends TestCase
         ]);
 
         try {
-            $this->puntjes()->products->list(new ProductFilters(search: "\xFF"))->firstPage();
+            $this->puntjes()->products()->get(new ProductsRequestBuilderGetRequestConfiguration(
+                queryParameters: ProductsRequestBuilderGetRequestConfiguration::createQueryParameters(search: "\xFF"),
+            ))->wait();
             self::fail('Expected a ValidationException.');
         } catch (ValidationException $e) {
             self::assertSame(422, $e->status());
@@ -137,7 +139,7 @@ final class ErrorMappingTest extends TestCase
         $this->fake->queueError(404, 'ROUTE_NOT_FOUND', 'The route could not be found.');
 
         try {
-            $this->puntjes()->products->find("SKU-1\0");
+            $this->puntjes()->products()->byExternalId("SKU-1\0")->get()->wait();
             self::fail('Expected a NotFoundException.');
         } catch (NotFoundException $e) {
             self::assertTrue($e->is(ErrorCode::RouteNotFound));
@@ -159,7 +161,7 @@ final class ErrorMappingTest extends TestCase
         $puntjes = $this->puntjes();
 
         try {
-            $puntjes->me();
+            $puntjes->me()->get()->wait();
             self::fail('Expected an ApiException.');
         } catch (ApiException $e) {
             self::assertNotInstanceOf(ValidationException::class, $e);
@@ -177,7 +179,7 @@ final class ErrorMappingTest extends TestCase
         $puntjes = $this->puntjes();
 
         try {
-            $puntjes->me();
+            $puntjes->me()->get()->wait();
             self::fail('Expected a ValidationException.');
         } catch (ValidationException $e) {
             self::assertSame(['The total amount field is required.'], $e->errorsFor('total_amount'));
@@ -194,7 +196,7 @@ final class ErrorMappingTest extends TestCase
         $puntjes = $this->puntjes();
 
         try {
-            $puntjes->me();
+            $puntjes->me()->get()->wait();
             self::fail('Expected an ApiException.');
         } catch (ApiException $e) {
             self::assertSame('SOME_FUTURE_CODE', $e->code());
@@ -214,7 +216,7 @@ final class ErrorMappingTest extends TestCase
         $this->expectException(TransportException::class);
         $this->expectExceptionMessage('non-JSON error response');
 
-        $puntjes->me();
+        $puntjes->me()->get()->wait();
     }
 
     public function test_a_non_json_5xx_maps_to_a_server_error(): void
@@ -227,7 +229,7 @@ final class ErrorMappingTest extends TestCase
         $puntjes = $this->puntjes(maxRetries: 0);
 
         try {
-            $puntjes->me();
+            $puntjes->me()->get()->wait();
             self::fail('Expected a ServerException.');
         } catch (ServerException $e) {
             self::assertSame(502, $e->status());
@@ -235,18 +237,6 @@ final class ErrorMappingTest extends TestCase
             self::assertNull($e->errorCode());
             self::assertStringContainsString('Bad Gateway', $e->getMessage());
         }
-    }
-
-    public function test_a_success_body_without_the_data_envelope_is_rejected(): void
-    {
-        $this->fake->queueJson(200, ['unexpected' => 'shape']);
-
-        $puntjes = $this->puntjes();
-
-        $this->expectException(TransportException::class);
-        $this->expectExceptionMessage('no "data" envelope');
-
-        $puntjes->me();
     }
 
     public function test_retry_after_accepts_an_http_date(): void
@@ -258,12 +248,20 @@ final class ErrorMappingTest extends TestCase
         $puntjes = $this->puntjes(maxRetries: 0);
 
         try {
-            $puntjes->me();
+            $puntjes->me()->get()->wait();
             self::fail('Expected a RateLimitException.');
         } catch (RateLimitException $e) {
             self::assertNotNull($e->retryAfter());
             self::assertGreaterThan(50, $e->retryAfter());
             self::assertLessThanOrEqual(60, $e->retryAfter());
         }
+    }
+
+    private static function product(string $name): UpsertProductData
+    {
+        $body = new UpsertProductData;
+        $body->setName($name);
+
+        return $body;
     }
 }

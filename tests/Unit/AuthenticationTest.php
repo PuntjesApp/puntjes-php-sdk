@@ -11,9 +11,10 @@ use Puntjes\Auth\InMemoryTokenStore;
 use Puntjes\Config;
 use Puntjes\Exception\AuthenticationException;
 use Puntjes\Exception\ServerException;
+use Puntjes\Generated\Models\CreateCustomerData;
+use Puntjes\Generated\Models\CreateIdentifierData;
+use Puntjes\Generated\Models\CreateIdentifierData_type;
 use Puntjes\Http\HttpClient;
-use Puntjes\Request\CreateCustomer;
-use Puntjes\Request\CreateIdentifier;
 use Puntjes\Tests\Support\TestCase;
 
 final class AuthenticationTest extends TestCase
@@ -24,7 +25,7 @@ final class AuthenticationTest extends TestCase
         $this->fake->queueData(['display_name' => 'Bakkerij Jan']);
 
         $puntjes = $this->puntjes();
-        $puntjes->me();
+        $puntjes->me()->get()->wait();
 
         self::assertSame(2, $this->fake->requestCount());
         self::assertSame('https://app.puntjes.test/oauth/token', $this->fake->uriAt(0));
@@ -37,7 +38,7 @@ final class AuthenticationTest extends TestCase
         $this->fake->queueToken();
         $this->fake->queueData(['display_name' => 'Bakkerij Jan']);
 
-        $this->puntjes()->me();
+        $this->puntjes()->me()->get()->wait();
 
         $grant = $this->fake->requestAt(0);
         self::assertSame('application/x-www-form-urlencoded', $grant->getHeaderLine('Content-Type'));
@@ -57,8 +58,8 @@ final class AuthenticationTest extends TestCase
         $this->fake->queueData(['display_name' => 'Two']);
 
         $puntjes = $this->puntjes();
-        $puntjes->me();
-        $puntjes->me();
+        $puntjes->me()->get()->wait();
+        $puntjes->me()->get()->wait();
 
         // Three requests, not four: the token was granted once.
         self::assertSame(3, $this->fake->requestCount());
@@ -70,12 +71,12 @@ final class AuthenticationTest extends TestCase
 
         $this->fake->queueToken('tok-shared');
         $this->fake->queueData(['display_name' => 'One']);
-        $this->puntjes(store: $store)->me();
+        $this->puntjes(store: $store)->me()->get()->wait();
 
         // A second client with the same credentials and store must not re-grant —
         // this is what makes the Laravel/WordPress stores worth having.
         $this->fake->queueData(['display_name' => 'Two']);
-        $this->puntjes(store: $store)->me();
+        $this->puntjes(store: $store)->me()->get()->wait();
 
         self::assertSame(3, $this->fake->requestCount());
         self::assertSame('Bearer tok-shared', $this->fake->requestAt(2)->getHeaderLine('Authorization'));
@@ -109,9 +110,9 @@ final class AuthenticationTest extends TestCase
         $this->fake->queueToken('tok-new');
         $this->fake->queueData(['display_name' => 'Bakkerij Jan']);
 
-        $branding = $this->puntjes()->me();
+        $branding = $this->puntjes()->me()->get()->wait()->getData();
 
-        self::assertSame('Bakkerij Jan', $branding->displayName);
+        self::assertSame('Bakkerij Jan', $branding->getDisplayName());
         self::assertSame(4, $this->fake->requestCount());
         self::assertSame('Bearer tok-old', $this->fake->requestAt(1)->getHeaderLine('Authorization'));
         self::assertSame('Bearer tok-new', $this->fake->requestAt(3)->getHeaderLine('Authorization'));
@@ -126,7 +127,7 @@ final class AuthenticationTest extends TestCase
 
         $this->expectException(AuthenticationException::class);
 
-        $this->puntjes()->me();
+        $this->puntjes()->me()->get()->wait();
     }
 
     public function test_rejected_credentials_raise_an_authentication_exception_without_leaking_the_secret(): void
@@ -137,7 +138,7 @@ final class AuthenticationTest extends TestCase
         ]);
 
         try {
-            $this->puntjes()->me();
+            $this->puntjes()->me()->get()->wait();
             self::fail('Expected an AuthenticationException.');
         } catch (AuthenticationException $e) {
             self::assertSame('INVALID_CLIENT', $e->code());
@@ -158,8 +159,9 @@ final class AuthenticationTest extends TestCase
     {
         $this->fake->queueData(['status' => 'ok']);
 
-        self::assertTrue($this->puntjes()->ping());
+        self::assertSame('ok', $this->puntjes()->health()->get()->wait()?->getData()?->getStatus());
         self::assertSame(1, $this->fake->requestCount());
+        self::assertSame('/api/v1/health', $this->fake->requestAt(0)->getUri()->getPath());
         self::assertFalse($this->fake->requestAt(0)->hasHeader('Authorization'));
     }
 
@@ -171,9 +173,9 @@ final class AuthenticationTest extends TestCase
         $this->fake->queueToken('tok-after-blip');
         $this->fake->queueData(['display_name' => 'Bakkerij Jan']);
 
-        $branding = $this->puntjes()->me();
+        $branding = $this->puntjes()->me()->get()->wait()->getData();
 
-        self::assertSame('Bakkerij Jan', $branding->displayName);
+        self::assertSame('Bakkerij Jan', $branding->getDisplayName());
         self::assertSame([0.5], $this->sleeps);
         self::assertSame('Bearer tok-after-blip', $this->fake->requestAt(2)->getHeaderLine('Authorization'));
     }
@@ -183,7 +185,7 @@ final class AuthenticationTest extends TestCase
         $this->fake->queueTokenNetworkFailure();
         $this->fake->queueData(['display_name' => 'Bakkerij Jan']);
 
-        self::assertSame('Bakkerij Jan', $this->puntjes()->me()->displayName);
+        self::assertSame('Bakkerij Jan', $this->puntjes()->me()->get()->wait()->getData()->getDisplayName());
         self::assertSame([0.5], $this->sleeps);
     }
 
@@ -196,7 +198,7 @@ final class AuthenticationTest extends TestCase
         );
         $this->fake->queueData(['display_name' => 'Bakkerij Jan']);
 
-        $this->puntjes()->me();
+        $this->puntjes()->me()->get()->wait();
 
         self::assertSame([3.0], $this->sleeps);
     }
@@ -210,11 +212,15 @@ final class AuthenticationTest extends TestCase
         ]);
         $this->fake->queueData(['id' => 7], 201);
 
-        $customer = $this->puntjes()->customers->register(new CreateCustomer(
-            identifiers: [CreateIdentifier::loyaltyCard('B3H9RT5W')],
-        ));
+        $identifier = new CreateIdentifierData;
+        $identifier->setType(new CreateIdentifierData_type(CreateIdentifierData_type::LOYALTY_CARD));
+        $identifier->setValue('B3H9RT5W');
+        $body = new CreateCustomerData;
+        $body->setIdentifiers([$identifier]);
 
-        self::assertSame(7, $customer->id);
+        $customer = $this->puntjes()->customers()->post($body)->wait()->getData();
+
+        self::assertSame(7, $customer->getId());
         self::assertSame([0.5], $this->sleeps);
         // Exactly one actual API request — the retry replayed the grant, not the POST.
         self::assertSame(1, $this->fake->apiRequestCount());
@@ -231,7 +237,7 @@ final class AuthenticationTest extends TestCase
         $puntjes = $this->puntjes(maxRetries: 0);
 
         try {
-            $puntjes->me();
+            $puntjes->me()->get()->wait();
             self::fail('Expected a ServerException.');
         } catch (ServerException $e) {
             self::assertSame('INTERNAL_ERROR', $e->code());
@@ -251,7 +257,7 @@ final class AuthenticationTest extends TestCase
         $this->expectException(AuthenticationException::class);
 
         try {
-            $puntjes->me();
+            $puntjes->me()->get()->wait();
         } finally {
             // One grant attempt, no sleeps: bad credentials are not transient.
             self::assertSame(1, $this->fake->requestCount());

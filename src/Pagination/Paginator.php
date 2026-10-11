@@ -5,94 +5,32 @@ declare(strict_types=1);
 namespace Puntjes\Pagination;
 
 use Generator;
-use IteratorAggregate;
 
 /**
- * Lazily walks every page of a list endpoint.
- *
- *     foreach ($puntjes->products->all() as $product) { … }
- *
- * Pages are fetched on demand, one at a time, so a large catalogue never has to fit
- * in memory at once. Iteration stops when the paginator reports the last page — it
- * does not trust an empty page as the end condition, because a page emptied by
- * concurrent deletions is not the same thing as the end of the list.
- *
- * @template T
- *
- * @implements IteratorAggregate<int, T>
+ * Walks a paginated call page by page; the API wraps each page as data.data with data.meta.
+ * It stops at the last page, and when an answer has no page number or not the page it asked for.
  */
-final class Paginator implements IteratorAggregate
+final class Paginator
 {
-    /** @var callable(int): Page<T> */
-    private $fetcher;
-
     /**
-     * @param  callable(int): Page<T>  $fetcher  Receives a 1-based page number.
+     * @param  callable(int): object  $fetch  Returns the generated response for one page number
+     * @return Generator<int, mixed, mixed, void>
      */
-    public function __construct(callable $fetcher, private readonly int $startPage = 1)
+    public static function of(callable $fetch): Generator
     {
-        $this->fetcher = $fetcher;
-    }
-
-    /** @return Page<T> */
-    public function page(int $number): Page
-    {
-        return ($this->fetcher)($number);
-    }
-
-    /**
-     * The first page, without walking any further.
-     *
-     * @return Page<T>
-     */
-    public function firstPage(): Page
-    {
-        return $this->page($this->startPage);
-    }
-
-    /**
-     * Every page in order.
-     *
-     * @return Generator<int, Page<T>>
-     */
-    public function pages(): Generator
-    {
-        $number = $this->startPage;
-
-        while (true) {
-            $page = $this->page($number);
-
-            yield $page;
-
-            if (! $page->hasMorePages()) {
+        for ($page = 1; ; $page++) {
+            $wrapper = $fetch($page)->getData();
+            $meta = $wrapper->getMeta();
+            $current = $meta?->getCurrentPage();
+            if ($page > 1 && $current !== $page) {
                 return;
             }
-
-            $number++;
+            foreach ($wrapper->getData() ?? [] as $item) {
+                yield $item;
+            }
+            if ($current !== $page || $page >= $meta?->getLastPage()) {
+                return;
+            }
         }
-    }
-
-    /**
-     * Every item across every page.
-     *
-     * @return Generator<int, T>
-     */
-    public function getIterator(): Generator
-    {
-        foreach ($this->pages() as $page) {
-            yield from $page->items;
-        }
-    }
-
-    /**
-     * Collect every item into one array.
-     *
-     * Convenient, but it fetches the whole list — prefer iterating for large catalogues.
-     *
-     * @return array<int, T>
-     */
-    public function all(): array
-    {
-        return iterator_to_array($this->getIterator(), false);
     }
 }

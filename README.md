@@ -1,21 +1,24 @@
 # puntjes/php-sdk
 
-Framework-agnostic PHP client for the [Puntjes](https://puntjes.app) loyalty API.
+PHP client for the [Puntjes](https://puntjes.app) loyalty API.
 
-Works anywhere PHP 8.1 runs — a Laravel webshop, a WooCommerce plugin, a POS bridge,
-a cron script. No HTTP client is forced on you.
+It works anywhere PHP 8.1 runs: a Laravel webshop, a WooCommerce plugin, a POS bridge,
+a cron script. It does not force an HTTP client on you.
 
-- **Laravel** → install [`puntjes/laravel`](https://github.com/PuntjesApp/puntjes-laravel) on top for config, a facade and cache-backed tokens.
-- **WordPress / WooCommerce** → use this package directly, plus the [notes below](#wordpress--woocommerce).
+The client is generated from the Puntjes OpenAPI spec, so it has every call the API has.
+
+- **Laravel**: install [`puntjes/laravel`](https://github.com/PuntjesApp/puntjes-laravel) on top for config, a facade and cache-backed tokens.
+- **WordPress / WooCommerce**: use this package directly, plus the [notes below](#wordpress--woocommerce).
+- **Coming from 1.x?** Read [`UPGRADING.md`](UPGRADING.md).
 
 ## Install
 
 ```bash
-composer require puntjes/php-sdk
+composer require puntjes/php-sdk:^2.0
 ```
 
-The SDK talks PSR-18, so it uses whatever HTTP client your project already has
-(Guzzle, Symfony HttpClient, …). If you have none, add one:
+The SDK talks PSR-18, so it uses the HTTP client your project already has (Guzzle,
+Symfony HttpClient, and so on). If you have none, add one:
 
 ```bash
 composer require guzzlehttp/guzzle
@@ -25,226 +28,142 @@ composer require guzzlehttp/guzzle
 
 ```php
 use Puntjes\Puntjes;
-use Puntjes\Request\SubmitTransaction;
 
-$puntjes = Puntjes::make(
-    clientId:     getenv('PUNTJES_CLIENT_ID'),
-    clientSecret: getenv('PUNTJES_CLIENT_SECRET'),
-    baseUrl:      'https://puntjes.app/api/v1',
-);
+$puntjes = Puntjes::make(getenv('PUNTJES_CLIENT_ID'), getenv('PUNTJES_CLIENT_SECRET'));
 
-// A customer scans their card at the till.
-$customer = $puntjes->customers->lookup(identifier: $scannedCard);
+$product = $puntjes->products()->byExternalId('SKU-1001')->get()->wait()->getData();
 
-echo $customer->fullName();      // "Jan Everaert"
-echo $customer->walletBalance;   // 320  (lookup folds the balance in)
-
-// Record the purchase. Amounts are in cents.
-$transaction = $puntjes->transactions->submit(new SubmitTransaction(
-    identifier:     $scannedCard,
-    totalAmount:    4200,
-    idempotencyKey: 'order-'.$order->id,
-));
-
-echo $transaction->pointsEarned; // 42
+echo $product->getName();
 ```
 
-Credentials come from **Puntjes → Settings → API clients**. The secret is shown once.
+Get the credentials in **Puntjes, Settings, API clients**. The secret is shown once.
 
-Authentication is handled for you: a `client_credentials` token is fetched on the
-first call, cached until it expires, and silently re-fetched once if the API ever
-rejects it.
+A call is a path and an HTTP method: `->customers()->byCustomer('42')->wallet()->get()`
+is `GET /customers/42/wallet`. Every call returns a promise. End it with `->wait()`, then
+read the `data` of the answer with `->getData()`.
 
-### Base URL
-
-Pass the base URL exactly as the [API docs](https://docs.puntjes.app) state it —
-`https://puntjes.app/api/v1`. The bare host works too; both are accepted and
-equivalent:
+A purchase at the till:
 
 ```php
-baseUrl: 'https://puntjes.app/api/v1'   // as documented
-baseUrl: 'https://puntjes.app'          // same thing
+use Puntjes\Generated\Models\CreateTransactionData;
+use Puntjes\IdempotencyKey;
+
+$body = new CreateTransactionData();
+$body->setIdentifier($scannedCard);
+$body->setTotalAmount(4200);                       // cents
+$body->setIdempotencyKey('order-'.$order->id);     // or IdempotencyKey::new()
+
+$transaction = $puntjes->transactions()->post($body)->wait()->getData();
+
+echo $transaction->getPointsEarned();
 ```
 
-Internally the SDK keeps only the host, because the two endpoints it talks to do not
-share a prefix: the API is under `/api/v1`, but the OAuth token endpoint is at
-`/oauth/token`, off the root.
+A query value goes in a request configuration:
+
+```php
+use Puntjes\Generated\Customers\Lookup\LookupRequestBuilderGetRequestConfiguration as Lookup;
+
+$customer = $puntjes->customers()->lookup()->get(new Lookup(
+    queryParameters: Lookup::createQueryParameters(identifier: $scannedCard),
+))->wait()->getData();
+
+echo $customer->getWalletBalance();
+```
+
+Pass query values to `createQueryParameters()` by name, as above. The generated method
+takes its arguments in alphabetical order, so a new query value in a later release moves
+the others, and a call by position then sends the wrong value.
+
+`Puntjes::make()` takes `baseUrl` (default `https://puntjes.app`; the API docs form
+`https://puntjes.app/api/v1` works too), `tokenStore`, `httpClient`, `requestFactory`,
+`streamFactory`, `maxRetries`, `defaultHeaders` and `sleeper`.
+
+## Clearing a field
+
+A setter with null does not clear a field: the client leaves a null value out of the
+request body. To clear a field in a PATCH (`UpdateCustomerData`, `UpdateProductData`), put
+the null in the additional data:
+
+```php
+use Puntjes\Generated\Models\UpdateCustomerData;
+
+$body = new UpdateCustomerData();
+$body->setAdditionalData(['phone' => null]);   // sends {"phone": null}
+```
 
 ## Amounts are in cents
 
-Every monetary value on this API — `totalAmount`, `unitPrice`, `priceCents`,
-`revenueCents` — is an integer number of cents. €42.00 is `4200`.
-
-The single exception is `Campaign::$minTransactionAmount`, which the API serialises
-in euros. It is documented on the model.
+Every money value on this API is a whole number of cents. 42.00 euro is `4200`.
 
 ## Retries and idempotency
 
-Retrying a request that already moved points is how integrations double-credit
-customers, so the SDK is deliberately conservative about what it replays.
+A retry of a request that already moved points is how an integration pays a customer
+twice. So the SDK retries only what is safe.
 
-| Call | Auto-retried? | Why |
+| Call | Retried? | Why |
 |---|---|---|
-| Any `GET` | ✅ | Reads have no effect |
-| `PUT` / `PATCH` / `DELETE` | ✅ | All keyed by external id; they converge |
-| `POST /transactions` | ✅ | Carries an `idempotency_key` |
-| `POST /redemptions` | ✅ | Carries an `idempotency_key` |
-| `POST …/wallet/adjust` | ✅ | Carries an `idempotency_key` |
-| `POST /customers` | ❌ | A replay would create a second customer |
-| `POST /products`, `/products/batch` | ❌ | No replay protection |
-| `POST /products/{sku}/reward` | ❌ unless you pass an idempotency key, then ✅ | Without a key, a replay creates a second reward. With `idempotencyKey:`, a replay answers the first reward |
-| `POST /redemptions/{code}/verify` | ❌ | A replay would answer `CODE_ALREADY_USED` |
-| `POST /vouchers/{code}/verify` | ❌ unless you pass an idempotency key, then ✅ | Verifying a bon *spends* it. Without a key, a replay answers `VOUCHER_ALREADY_USED`. With `idempotencyKey:`, a replay on the same bon answers the first success again |
-| `POST …/send-card` | ❌ | A replay emails the customer a second time |
-| `POST /customers/link-external-id` | ❌ | No idempotency key — though re-sending the *same* external id is safe if you retry yourself |
+| Any `GET` | Yes | A read changes nothing |
+| `PUT`, `PATCH`, `DELETE` | Yes | They name the record, so a repeat gives the same result |
+| A `POST` with an `idempotency_key` in the body | Yes | The API answers a repeated key with the first answer |
+| A `POST` without one | No | A repeat could create a second customer, send a second email or spend a code twice |
 
-Retries fire only on failures a later attempt could survive — connection errors, 5xx,
-and `429 RATE_LIMITED` — with exponential backoff, honouring `Retry-After`.
-`429 PLAN_LIMIT_EXCEEDED` is excluded: it shares the status code but is a billing
-stop that waiting cannot clear.
+A retry happens only after a failure that a later try could survive: no connection, a 5xx
+or a `429 RATE_LIMITED`. The wait doubles each time, and a `Retry-After` header wins.
+`429 PLAN_LIMIT_EXCEEDED` is never retried: waiting does not clear it.
 
-**Idempotency keys** are generated automatically when you do not supply one, and the
-same key is reused across the SDK's own retries. That protection ends with the object,
-though — if *your* code catches a failure and rebuilds the request, derive the key
-from something stable in your system:
+The SDK does not make an `idempotency_key` for you. Set one on every POST that moves points
+(`transactions`, `redemptions`, `wallet/adjust`), and on `vouchers/{code}/verify` and
+`products/{sku}/reward`, where a key also makes the call safe to retry.
+`IdempotencyKey::new()` gives a new random key. A key from your own data, such as
+`'order-'.$order->id`, is better: it is the same after a restart.
 
-```php
-new SubmitTransaction(
-    identifier:     $card,
-    totalAmount:    4200,
-    idempotencyKey: 'order-'.$order->id,   // survives a process restart
-);
-```
+Keys belong to one shop. The same key with another customer, amount or reward answers
+`IDEMPOTENCY_KEY_CONFLICT`, and nothing is written.
 
-Keys are scoped per vendor. Reusing one for a different customer, a different
-`totalAmount` or a different reward returns `IDEMPOTENCY_KEY_CONFLICT` rather than
-someone else's transaction or confirmation code, and nothing is written.
+## Pages
 
-**`vouchers->verify()` is the exception.** The SDK does not make a key for it. It sends
-`idempotency_key` only when you pass `idempotencyKey:`, and only then retries it. Make the
-key from your sale, so a repeat on the same bon answers the first success again. The same
-key on another bon answers `IDEMPOTENCY_KEY_CONFLICT`, and that bon stays unspent. A key
-sent after an earlier spend without a key answers `VOUCHER_ALREADY_USED`. To read a bon
-without spending it, call `$puntjes->vouchers->find($code)`: its `status` is
-`VoucherStatus::Valid`, `Used` or `Expired`, and an expired bon is an answer, not an error.
-A customer who comes without the code can still spend a bon: `$puntjes->vouchers->forCustomer($id)`
-lists the bons they can still spend, and you verify the one they pick.
-
-**`products->createReward()` works the same way.** The SDK does not make a key for it, because
-a Puntjes from before the key ignores it, and a retry would then create a second reward. Pass
-`idempotencyKey:` to make it safe to retry. A repeat with the same key, the same product, the
-same `pointCost` and the same `paymentAmount` answers the first reward, even when the shop
-changed its name, stock or dates since. The same key with another product or another amount,
-or a key whose reward was deleted, answers `IDEMPOTENCY_KEY_CONFLICT` and creates nothing.
-
-## Branches
-
-A vendor can run several shops, and the API can record which one a purchase, a
-redemption or a bon happened at. A branch is addressed by the **key the vendor chose**
-in the portal — never by a Puntjes id — so nothing here asks your system to store a
-primary key it would then have to keep in step.
-
-### Naming a branch on a write
+A list answer holds one page. `Paginator::of()` walks all of them, and asks for the next
+page only when your loop needs it:
 
 ```php
-$puntjes->transactions->submit(new SubmitTransaction(
-    identifier:  $scannedCard,
-    totalAmount: 4200,
-    branch:      'centrum',
-));
+use Puntjes\Generated\Products\ProductsRequestBuilderGetRequestConfiguration as Products;
+use Puntjes\Pagination\Paginator;
 
-$puntjes->redemptions->create(new CreateRedemption('CARD-1', rewardId: 3, branch: 'centrum'));
-$puntjes->vouchers->verify('BON-ABC12345', branch: 'centrum');
+$all = Paginator::of(fn (int $page) => $puntjes->products()->get(new Products(
+    queryParameters: Products::createQueryParameters(page: $page),
+))->wait());
+
+foreach ($all as $product) {
+    echo $product->getExternalId();
+}
 ```
 
-The API resolves it in one order: **the payload, then the branch your API credential
-defaults to, then no branch at all.** A till that only ever serves one shop is better
-configured once — set the default branch on its credential in *Settings → API clients* —
-than made to send `branch:` on every call.
+`rewards()->get()` and a customer's `vouchers()->get()` are not paged. They answer in one call.
 
-Two ways it can be wrong, kept deliberately distinct so you can tell them apart:
+## Wallet passes
 
-| Code | Meaning |
-|---|---|
-| `BRANCH_NOT_FOUND` | The key names no branch this vendor has. You typed it wrong. |
-| `BRANCH_INACTIVE` | The vendor closed that shop. Only `POST /transactions` raises it. |
-| `BRANCH_REQUIRED` | The reward or bon is limited to particular branches, and this is not one. |
-
-All three are 422 and nothing is recorded.
-
-### Reading a branch back
-
-```php
-$transaction->branch?->name;       // "Centrum", or null for the Unassigned bucket
-$transaction->branch?->externalId; // "centrum" — the key to send back
-$transaction->branch?->type;       // BranchType::Physical
-```
-
-Rewards and campaigns carry the branches they are limited to. **`null` and `[]` mean
-opposite things and are never collapsed:**
-
-```php
-$reward->branches === null   // redeemable anywhere
-$reward->branches === []     // scoped, but every shop it named has since been deleted
-$reward->isRedeemableEverywhere();
-$campaign->runsEverywhere();
-$bon->isSpendableAt('centrum');    // an open voucher from vouchers->forCustomer()
-```
-
-### Rates after an import
-
-```php
-$loyalty = $puntjes->statistics->get(Period::ThirtyDays)->loyalty;
-
-$rate = $loyalty?->redemptionRateExcludingImport ?? $loyalty?->redemptionRate;
-```
-
-Points a customer brought along from another loyalty system never count as issued, but they
-do count when they are spent or expire, so `redemptionRate` and `breakageRate` can pass 1.0
-after an import. The `…ExcludingImport` rates leave those points out of both sides, as the
-Puntjes dashboard does. They are null when nothing was issued, and from a Puntjes that does
-not send them yet, so the fallback above covers both.
-
-### Filtering a report
-
-```php
-use Puntjes\Model\Branch;
-
-$puntjes->statistics->get(Period::ThirtyDays, branch: 'centrum');
-$puntjes->statistics->get(Period::ThirtyDays, branch: Branch::UNASSIGNED);  // 'none'
-$puntjes->campaigns->list(branch: 'centrum');
-```
-
-There are three states here, not two: **omitting** `branch` covers the whole vendor,
-`Branch::UNASSIGNED` covers only what was recorded against no branch, and a key covers
-that one shop. A mistyped key is refused with `BRANCH_NOT_FOUND` rather than answered
-vendor-wide — a report that silently widens under a branch label is the one mistake
-nobody catches by reading it.
-
-`Branch::UNASSIGNED` is a **filter word only**. On a write it is an unknown key, because
-a purchase has to have happened somewhere.
-
-> Under a branch filter, `$stats->loyalty` is **null**. Points liability is a wallet
-> snapshot and breakage is a ratio whose halves come from different populations —
-> neither narrows to one shop, so the API omits the block rather than printing a
-> vendor-wide number beside branch-filtered sales. Check for null before reading it.
+`WalletPass::apple($puntjes, $customerId)` returns the Apple pass (a `.pkpass` file) as a stream.
+For Google, call `->walletPass()->get()` with the query `platform: google` and read
+`->getData()->getSaveUrl()`.
 
 ## Errors
 
-Everything the SDK raises extends `Puntjes\Exception\PuntjesException`.
+Everything the SDK throws extends `Puntjes\Exception\PuntjesException`.
 
 ```php
-use Puntjes\Enum\ErrorCode;
 use Puntjes\Exception\{ApiException, NotFoundException, ValidationException};
+use Puntjes\Generated\Errors\ErrorCode;
 
 try {
-    $puntjes->redemptions->create($redemption);
+    $puntjes->redemptions()->post($body)->wait();
 } catch (NotFoundException $e) {
-    // 404 — unknown customer or reward
+    // 404: no such customer or reward
 } catch (ValidationException $e) {
     $e->errorsFor('reward_id');   // ['The reward id field is required.']
 } catch (ApiException $e) {
-    if ($e->is(ErrorCode::InsufficientBalance)) { … }
+    if ($e->errorCode() === ErrorCode::InsufficientBalance) {
+        // ...
+    }
 
     $e->status();      // 422
     $e->code();        // 'INSUFFICIENT_BALANCE'
@@ -254,354 +173,81 @@ try {
 
 | Exception | When |
 |---|---|
-| `AuthenticationException` | 401. `UNAUTHENTICATED`: the token is missing, unreadable, expired or revoked; the SDK already got a new one once, so the credentials are wrong or revoked. `INVALID_CLIENT`: the client is wrong (no vendor, or it cannot use client credentials); a new token does not fix it |
-| `ForbiddenException` | 403 — vendor pending, suspended or deactivated |
-| `NotFoundException` | 404 — no such record *for this vendor* |
-| `ConflictException` | 409 — duplicate identifier, external id or SKU |
+| `AuthenticationException` | 401. The token is missing, unreadable, expired or revoked. The SDK already got a new token once, so the credentials are wrong or revoked. Or the client may not use client credentials |
+| `ForbiddenException` | 403: the shop is pending, suspended or deactivated |
+| `NotFoundException` | 404: no such record for this shop |
+| `ConflictException` | 409: a duplicate identifier, external id or SKU |
 | `ValidationException` | 422 `VALIDATION_ERROR`, with `errors()` |
 | `RateLimitException` | 429 `RATE_LIMITED`, with `retryAfter()` |
-| `PlanLimitExceededException` | 429 `PLAN_LIMIT_EXCEEDED` — upgrade the plan |
+| `PlanLimitExceededException` | 429 `PLAN_LIMIT_EXCEEDED`: the plan is used up |
 | `ServerException` | 5xx |
-| `ApiException` | Any other API error, including 400 `INVALID_JSON`, 415 `UNSUPPORTED_MEDIA_TYPE` and 422 domain refusals |
-| `TransportException` | No HTTP response at all, or a non-JSON body |
-| `ConfigurationException` | Bad settings — raised before any request |
-
-> `422` covers both validation failures *and* domain refusals like
-> `INSUFFICIENT_BALANCE` or `OUT_OF_STOCK`. Only the former is a `ValidationException`,
-> so catching it never silently swallows a business outcome you needed to handle.
-
-### Unreadable requests
-
-Some requests reach the API in a shape it cannot read. The answer is always an error, and
-the API changes nothing:
-
-| What was sent | Answer | Exception |
-|---|---|---|
-| A JSON body that is cut off, or is not valid UTF-8 | 400 `INVALID_JSON` | `ApiException` |
-| A query value or form field that is not valid UTF-8 | 422 `VALIDATION_ERROR`, with the field named | `ValidationException` |
-| A path with a NUL byte or text that is not valid UTF-8 | 404 `ROUTE_NOT_FOUND` | `NotFoundException` |
-
-Sending the same request again gives the same answer, so the SDK never replays these.
-Fix the text in your own code first. For `INVALID_JSON`, check `$e->is(ErrorCode::InvalidJson)`.
-The SDK writes JSON with `json_encode` and stops on bad UTF-8 before it sends, so you should rarely see this code.
-
-`ErrorCode` is an enum of every documented code. Unknown codes — a newer API than
-your SDK — leave `errorCode()` null while `code()` still returns the raw string, so a
-new server-side code can never break an older client.
-
-## Pagination
-
-List endpoints return a lazy `Paginator`. Iterating it walks every page on demand.
-
-```php
-foreach ($puntjes->products->list() as $product) {   // fetches pages as needed
-    echo $product->externalId;
-}
-
-$page = $puntjes->products->list()->firstPage();     // just the first page
-$page->meta->total;
-$page->hasMorePages();
-
-$all = $puntjes->campaigns->list()->all();           // everything, eagerly
-```
-
-`rewards->list()` is not paginated — the catalogue comes back in one call.
-
-## Endpoints
-
-```php
-// Customers
-$puntjes->customers->lookup(identifier: 'CARD-1');       // or externalId:
-$puntjes->customers->findByIdentifier('CARD-1');         // null instead of throwing
-$puntjes->customers->findByExternalId('PNU-1');
-$puntjes->customers->register(new CreateCustomer(...));
-$puntjes->customers->find(42);                           // a deactivated customer too: isDeactivated is true
-$puntjes->customers->updateByExternalId('PNU-1', new UpdateCustomer(email: 'new@example.com'));
-$puntjes->customers->linkExternalId('CARD-1', 'PNU-1');   // backfill a legacy customer
-$puntjes->customers->sendCard(42);                        // email them their loyalty card
-$puntjes->customers->sendCardByExternalId('PNU-1');
-
-// Transactions
-$puntjes->transactions->submit(new SubmitTransaction(...));
-$puntjes->transactions->forCustomer(42, new DateRangeFilters(dateFrom: '2026-07-01'));
-
-// Wallets
-$puntjes->wallets->show(42);
-$puntjes->wallets->ledger(42, new DateRangeFilters(type: 'earn'));
-$puntjes->wallets->adjust(42, AdjustWallet::credit(100, 'Goodwill'));
-$puntjes->wallets->applePass(42);        // raw .pkpass bytes — EXPERIMENTAL, see below
-$puntjes->wallets->googlePassUrl(42);    // save URL to redirect to — EXPERIMENTAL, see below
-
-// Rewards & redemptions
-$puntjes->rewards->list();
-$puntjes->rewards->list(affordableFor: 'CARD-1');
-$puntjes->rewards->list(countRedemptionsFor: 'CARD-1');           // the whole list, with this customer's count
-$puntjes->redemptions->create(new CreateRedemption('CARD-1', rewardId: 3));
-$puntjes->redemptions->find('PNTJ-ABC123');
-$puntjes->redemptions->forCustomer(42, RedemptionStatus::Valid);   // rewards still to collect, no code needed
-$puntjes->redemptions->verify('PNTJ-ABC123');
-
-// Campaign bonnen — the vouchers a campaign gives away. Verifying SPENDS one.
-$puntjes->vouchers->find('BON-ABC12345');                                  // read only: status valid, used or expired
-$puntjes->vouchers->forCustomer(42);                                       // the bons still to spend, no code needed
-$puntjes->vouchers->verify('BON-ABC12345');
-$puntjes->vouchers->verify('BON-ABC12345', idempotencyKey: 'sale-'.$sale->id);  // safe to retry
-
-// Products — keyed on YOUR SKU, never on a Puntjes id
-$puntjes->products->list(new ProductFilters(category: 'Bakery'));
-$puntjes->products->create(new CreateProduct(externalId: 'SKU-1', name: 'Brood'));
-$puntjes->products->find('SKU-1');
-$puntjes->products->findOrNull('SKU-1');
-$puntjes->products->upsert('SKU-1', new UpsertProduct(name: 'Brood'));   // sync primitive
-$puntjes->products->update('SKU-1', new UpdateProduct(priceCents: 275)); // partial
-$puntjes->products->delete('SKU-1');
-$puntjes->products->batchUpsert(['SKU-1' => $a, 'SKU-2' => $b]);         // max 100
-$puntjes->products->createReward('SKU-1', new CreateRewardFromProduct(pointCost: 200));
-$puntjes->products->createReward('SKU-1', new CreateRewardFromProduct(pointCost: 200, idempotencyKey: 'reward-SKU-1'));  // safe to retry
-
-// Campaigns, statistics, vendor
-$puntjes->campaigns->list();
-$puntjes->campaigns->list(branch: 'centrum');
-$puntjes->statistics->get(Period::ThirtyDays);
-$puntjes->statistics->get(Period::ThirtyDays, branch: 'centrum');
-$puntjes->me();
-$puntjes->ping();   // unauthenticated health check
-```
-
-### Wallet passes (experimental)
-
-`applePass()` and `googlePassUrl()` target `GET /customers/{id}/wallet-pass`, a
-feature that is **not yet fully integrated on the Puntjes side**. Treat both as
-experimental: verify them against your target environment before shipping, and give
-your HTTP client a request timeout — an instance whose pass integration is incomplete
-can hang rather than fail. `googlePassUrl()` throws a `TransportException` when the
-response carries no usable save URL, so you can never end up redirecting a customer
-to an empty string.
-
-### Catalogue sync
-
-`upsert()` is the primitive to build on: pushing the same row repeatedly converges
-on one product, so a sync job is safe to re-run.
-
-```php
-$result = $puntjes->products->batchUpsert($chunk);   // up to 100 at a time
-```
-
-`batchUpsert` **never throws for a bad row** — each item is processed independently
-and the call answers 200 even when every item failed. Always inspect the result:
-
-```php
-if ($result->hasFailures()) {
-    foreach ($result->failures() as $failure) {
-        $log->warning('Product rejected', [
-            'sku' => $failure->externalId,
-            'errors' => $failure->errors,
-        ]);
-    }
-}
-```
-
-Note that `upsert()` (PUT) **replaces** the whole product — omitted nullable fields
-are cleared. That is what makes it converge. Use `update()` (PATCH) to change one
-field and leave the rest alone.
-
-### Omitted vs null on partial updates
-
-PATCH requests distinguish "leave this alone" from "clear this", so the defaults are
-`Undefined`, not `null`:
-
-```php
-new UpdateCustomer(email: 'new@example.com')  // changes only the email
-new UpdateCustomer(phone: null)               // clears the phone number
-```
-
-### Registering a customer, and what an identifier can be
-
-Send no identifiers and Puntjes issues the loyalty card itself. That is the common case,
-and it is the shortest correct call:
-
-```php
-$customer = $puntjes->customers->register(new CreateCustomer(firstName: 'Jan'));
-$customer->loyaltyCardCode;   // "7KQ4M2XP", 8 chars of A-Z0-9
-```
-
-Pass a loyalty card only when the customer already holds a printed one. The value must be
-a card your vendor has actually printed and not yet handed to anyone: the API matches it
-against its own card stock, case-insensitively, and refuses anything else with a 422
-`LOYALTY_CARD_NOT_FOUND`, or a 409 `IDENTIFIER_DUPLICATE` if that card already belongs to
-somebody. You cannot invent the value.
-
-```php
-new CreateCustomer(identifiers: [CreateIdentifier::loyaltyCard('7KQ4M2XP')]);
-new CreateCustomer(identifiers: [CreateIdentifier::email('jan@example.com')]);
-```
-
-Registration accepts those two types and nothing else. The scan technologies an earlier
-API supported (`card`, `qr`, `nfc`, `barcode`) were removed, with no alias window, so
-sending one is a 422 rather than a translation.
-
-`IdentifierType::Phone` still exists because the API still returns it on customers
-migrated before the change. It cannot be registered.
-
-### Customer consent and the loyalty card code
-
-Registration returns the customer's card code at the top level — persist it as their QR
-value rather than digging it back out of the identifier list:
-
-```php
-$customer = $puntjes->customers->register($new);
-$customer->loyaltyCardCode;   // "7KQ4M2XP", 8 chars of A-Z0-9
-```
-
-Marketing consent comes back decided, with the provenance behind it, so nothing has to
-re-implement the grant-versus-withdrawal rule:
-
-```php
-$customer->hasMarketingConsent();                    // true
-$customer->marketingConsent->grantedAt;              // "2026-03-03T09:00:00+00:00"
-$customer->marketingConsent->grantedSource;          // "webshop"
-
-new CreateCustomer(identifiers: [...], marketingConsent: true);
-new UpdateCustomer(marketingConsent: false);         // records a withdrawal
-new UpdateCustomer();                                // leaves consent exactly as it was
-```
-
-Only send `true` when the customer actually opted in on your side — this is the record
-the vendor relies on to prove consent.
-
-### Not every campaign multiplies points
-
-`Campaign::$family` says what kind a campaign is. A `purchase` campaign carries a
-multiplier and a schedule; a `customer_moment` one (a birthday gift, say) carries
-neither and sends null for `multiplier`, `recurrenceType` and `recurrenceConfig`.
-Branch on `family` before reading any of the three.
-
-### A reward with no stock limit
-
-`isUnlimited` on a catalogue reward and on `createReward()`'s answer is true when the reward
-has no stock limit. `remainingStock` is then `0`, so read `isUnlimited` first and do not show
-such a reward as sold out. A Puntjes that does not send the field yet reads it from
-`totalStock`, which is null for the same rewards.
-
-```php
-foreach ($puntjes->rewards->list() as $reward) {
-    $soldOut = ! $reward->isUnlimited && $reward->remainingStock === 0;
-}
-```
-
-### A reward can cost points plus an amount
-
-A free-product reward can ask for money on top of the points, for example "500 points +
-€ 2,00". Puntjes does not take that money; the till collects it. The amount is in cents,
-and `0` means points only.
-
-```php
-$rewards[0]->paymentAmount;       // 200: show it next to the points before the customer picks
-$redemption->paymentAmount();     // 200: collect this at the till; always 0 for a discount
-$redemption->productReference();  // 'STEAK-01': the item number of the product to hand over
-$puntjes->products->createReward('SKU-1', new CreateRewardFromProduct(pointCost: 500, paymentAmount: 200));
-```
-
-A redemption keeps a copy of what it was worth when it was made. If the vendor changes the
-reward later, `find()`, `forCustomer()` and `verify()` still answer the old amount, so
-collect what the redemption says, not what the catalogue says today.
-
-### A discount can be on one product
-
-A discount reward or a campaign discount gift can count on one product instead of the
-whole purchase, for example "20% off the kernthermometer". The till gets that product's
-item number. With no item number, the discount counts on the whole purchase, as before.
-
-```php
-$rewards[0]->isDiscountOnOneProduct();           // true: check KT-10234 is on the sale before the claim
-$rewards[0]->productReference;                   // 'KT-10234', straight from GET /rewards
-$redemption->productReference();                 // 'KT-10234', or null for the whole purchase
-$voucher = $puntjes->vouchers->verify('BON-ABC12345');
-$voucher->discount?->isOnOneProduct();           // true
-$voucher->discount?->productReference;           // 'KT-10234'
-$voucher->discount?->appliedTo($priceCents);     // the amount the discount counts on, see below
-```
-
-Pass `appliedTo()` the amount the discount counts on: that product's price, or its line total
-if your till applies it to every unit. Puntjes leaves that choice to the till. A fixed amount
-can be more than the product's price; `appliedTo()` never takes off more than you pass. A campaign's `config['gift']['discount']['product_id']` names the
-product of a discount gift, as `GET /products` returns its `id`.
-
-### A percentage or a fixed amount, before the redemption
-
-A catalogue reward says what kind of discount it is, so a till can decide before it spends the
-points. A till that adds up fixed amounts can ask the cashier first when a percentage would
-replace them, or skip the reward.
-
-```php
-$reward->isPercentageDiscount();    // true for "10% off"
-$reward->isFixedAmountDiscount();   // true for "€ 5,00 off"
-$reward->discountValue;             // 10 (percent) or 500 (cents); null for a free product
-```
-
-Both answers are false for a free product, and also on a Puntjes that does not send the kind yet:
-then the kind is unknown. Settle the sale with the redemption's `typeSpecificData`, which keeps
-the values of that moment, not with the list.
-
-### A reward can have a limit per customer
-
-A shop can let each customer redeem a reward only a few times, for example "at most 3 times".
-Name the customer when you read the catalogue, and each reward says how often that customer
-redeemed it. A redemption the shop cancelled does not count.
-
-```php
-foreach ($puntjes->rewards->list(countRedemptionsFor: 'CARD-1') as $reward) {
-    $reward->maxRedemptionsPerCustomer;   // 3, or null for no limit
-    $reward->customerRedemptions;         // 1: this customer redeemed it once
-    $reward->redemptionsLeft();           // 2; 0 means grey it out
-}
-```
-
-`affordableFor` fills the same count, so a till that already filters on the balance gets it too.
-`redemptionsLeft()` is null when there is no limit, or when the identifier matched nobody: then
-nothing is known. One more redemption past the limit throws an `ApiException` with
-`REDEMPTION_LIMIT_REACHED` (422), and points and stock do not move. Set the limit on a new reward
-with `new CreateRewardFromProduct(pointCost: 150, maxRedemptionsPerCustomer: 3)`.
+| `ApiException` | Any other API error, such as 400 `INVALID_JSON` and the 422 refusals |
+| `TransportException` | No HTTP answer at all, or a body that is not JSON |
+| `ConfigurationException` | Bad settings, found before any request |
+
+The API answers in JSON only. A success answer with another `Content-Type`, or with JSON
+that does not parse, throws `TransportException`. An answer with no `Content-Type` is read
+as JSON.
+
+A 422 can be a bad field or a business refusal like `INSUFFICIENT_BALANCE`. Only the bad
+field is a `ValidationException`, so catching it never hides a refusal you need to handle.
+
+`ErrorCode` lists every code the API documents. For a code that is newer than your SDK,
+`errorCode()` is null and `code()` still gives the raw string.
 
 ## Token storage
 
-By default tokens live in memory for one PHP process, which under PHP-FPM means one
-token grant per web request. Correct, but wasteful — supply a shared store:
+By default a token lives in memory for one PHP process. Under PHP-FPM that means one token
+request per web request. It works, but a shared store is better:
 
 ```php
-$puntjes = Puntjes::make(..., tokenStore: $yourStore);
+$puntjes = Puntjes::make($id, $secret, tokenStore: $yourStore);
 ```
 
-`TokenStore` has three methods (`get`, `put`, `forget`). Laravel users get a
-cache-backed implementation from `puntjes/laravel`; a WordPress one is below.
+`TokenStore` has three methods: `get`, `put` and `forget`. Laravel users get a cache-backed
+store from `puntjes/laravel`. A WordPress one is below.
 
-## Bringing your own HTTP client
+## Your own HTTP client
 
-Timeouts, proxies, TLS and instrumentation belong to the HTTP client, not to this SDK:
+Timeouts, proxies and TLS belong to the HTTP client:
 
 ```php
 $puntjes = Puntjes::make(
-    ...,
+    $id,
+    $secret,
     httpClient: new GuzzleHttp\Client([
         'timeout' => 10,
         'connect_timeout' => 5,
-        'http_errors' => false,   // let the SDK map error responses
+        'http_errors' => false,   // let the SDK turn error answers into exceptions
     ]),
 );
 ```
 
 ## WordPress / WooCommerce
 
-Two things matter when shipping this inside a plugin.
+Two things matter when you ship this inside a plugin.
 
-**1. Scope your dependencies.** A WordPress site runs every plugin in one PHP process.
-If two plugins bundle different versions of the same library, one of them breaks. Run
+**1. Scope your dependencies.** A WordPress site runs all plugins in one PHP process. If two
+plugins bundle different versions of one library, one of them breaks. Run
 [PHP-Scoper](https://github.com/humbug/php-scoper) or
-[Strauss](https://github.com/BrianHenryIE/strauss) over your vendor directory before
-distributing (Mozart is abandoned; Strauss is its successor). This SDK keeps its
-dependency list to PSR interfaces plus discovery precisely to make that cheap.
+[Strauss](https://github.com/BrianHenryIE/strauss) over your vendor folder before you
+distribute it. Scope every package this SDK installs. On PHP 8.4 with the newest versions
+that is:
 
-**2. Cache tokens in a transient.** Otherwise every page load grants a new token:
+- `guzzlehttp/psr7`, `ralouphie/getallheaders`, `php-http/discovery`, `php-http/promise`
+  and the `psr/*` interfaces (`psr/http-client`, `psr/http-factory`, `psr/http-message`,
+  `psr/cache`, `psr/log`)
+- the Kiota packages (`microsoft/kiota-abstractions`, `microsoft/kiota-serialization-json`,
+  `microsoft/kiota-serialization-text`) and `stduritemplate/stduritemplate`
+- what Kiota needs: `open-telemetry/api`, `open-telemetry/context`, `open-telemetry/sdk`,
+  `open-telemetry/sem-conv`, `tbachert/spi`, `nyholm/psr7-server`, `composer/semver`,
+  `doctrine/annotations`, `doctrine/lexer`, `ramsey/uuid`, `ramsey/collection` and
+  `brick/math`
+- the Symfony polyfills (`symfony/deprecation-contracts`, `symfony/polyfill-*`)
+
+Run `composer show --no-dev` in your plugin to see the exact list for your PHP version.
+
+**2. Cache tokens in a transient.** Without it, every page load asks for a new token:
 
 ```php
 use Puntjes\Auth\{AccessToken, TokenStore};
@@ -625,72 +271,64 @@ final class TransientTokenStore implements TokenStore
 
     private function key(string $key): string
     {
-        // Transient keys are capped at 172 characters.
-        return 'puntjes_'.md5($key);
+        return 'puntjes_'.md5($key);   // transient keys are 172 characters at most
     }
 }
 ```
 
-Store credentials in `wp_options`, encrypted at rest where the host allows it, and
-never log the secret.
+Keep the credentials in `wp_options`, encrypted at rest where the host allows it, and never
+log the secret.
 
 ## Rate limits
 
-Limits are per OAuth client (not per IP) and derived from the vendor's plan — 60
-requests/minute on the free tier. Several servers sharing one client share one budget.
-Exceeding it raises `RateLimitException`; the SDK already backs off and retries within
-`maxRetries`.
+The limit belongs to the shop, and its size follows the shop's plan. Plans can differ, so
+this README gives no number. Every API client and every server of one shop share the same
+limit. A shop that may not use the API is limited per IP address instead.
 
-## Secret rotation, without downtime
+When the API answers `429 RATE_LIMITED`, the SDK waits for the `Retry-After` time (or backs off when there is none) and tries
+again, up to `maxRetries`, and then throws `RateLimitException`. It does this only for a call
+that is safe to repeat (see [Retries and idempotency](#retries-and-idempotency)).
 
-A vendor may hold up to 10 active API clients, so rotation needs no maintenance window:
+## Changing the secret without downtime
+
+A shop can have more than one active API client, so no maintenance window is needed:
 
 1. Create a new API client in the portal.
 2. Deploy the new credentials.
 3. Revoke the old client.
 
-Tokens are cached per credential pair, so the two never collide mid-rotation.
-
-## Escape hatch
-
-For an endpoint this SDK does not model yet, or a field added after this version
-shipped — authentication, retries and error mapping still apply:
-
-```php
-$response = $puntjes->request('GET', '/some/new/endpoint', ['page' => 2]);
-$response->dataArray();
-```
+Tokens are cached per credential pair, so the two never mix.
 
 ## Development
 
 ```bash
 composer install
-composer test        # unit tests, no network
-composer analyse     # PHPStan level 6
-composer format      # Pint
+composer test            # the Unit suite, no network
+composer test:contract   # the Contract suite, needs a local Puntjes app
+composer analyse         # PHPStan
+composer format          # Pint
 ```
 
 ### Contract tests
 
-The unit suite proves the SDK behaves correctly against fixtures the SDK's own author
-wrote — which is exactly the blind spot that lets a wrong assumption about the wire
-format ship. The contract suite closes it by running against a real instance:
+The Unit suite checks the SDK against answers its authors wrote. The Contract suite calls
+a real app, so a wrong guess about the wire cannot hide. It runs only against a local
+app, because it creates customers, transactions and redemptions:
 
 ```bash
 PUNTJES_BASE_URL=http://localhost \
-PUNTJES_CLIENT_ID=… \
-PUNTJES_CLIENT_SECRET=… \
-vendor/bin/phpunit --testsuite Contract
+PUNTJES_CLIENT_ID=... \
+PUNTJES_CLIENT_SECRET=... \
+composer test:contract
 ```
 
-It is skipped when those variables are unset. Everything it writes is a product with
-a run-unique SKU, deleted afterwards whether or not the tests passed. It creates no
-customer, transaction or points data — the API cannot delete those, and a test has no
-business leaving balances behind.
+With the variables unset, or a base URL that is not local, the suite fails. A refusal is a
+failure, never a skip, because a skipped suite is green with no call made.
 
 ### Checks on a pull request
 
-Every pull request and every push to `main` runs PHPUnit, PHPStan and Pint in three runs:
+Every pull request and every push to `main` runs PHPUnit (Unit suite), PHPStan and Pint in
+three runs:
 
 | Run | What it installs | What it proves |
 |---|---|---|
@@ -698,32 +336,49 @@ Every pull request and every push to `main` runs PHPUnit, PHPStan and Pint in th
 | `PHP 8.1 · newest packages` | The newest versions that install on PHP 8.1 | The package works on its lowest PHP version today |
 | `PHP 8.4 · newest packages` | The newest versions of everything | The package works on a current PHP |
 
-The same PHP version appears twice on purpose: the two runs differ in the package versions,
-not in PHP. Pint runs once, on PHP 8.4, at a fixed version, so a new Pint release never
-turns an unrelated pull request red.
-
-The contract suite needs a live Puntjes and is skipped in these runs.
-
-The check named `CI` is green only when all three runs are green. `main` requires that one
-check, so a pull request cannot merge while a run is red.
+The check named `CI` is green only when all three runs are green.
 
 ### Releasing
 
-1. Write what changed under `## Unreleased` in `CHANGELOG.md`, in the pull request that
-   makes the change.
-2. In GitHub, open **Actions → Release → Run workflow** on `main`, and choose **patch**,
-   **minor** or **major**.
+Nobody runs a release by hand. [release-please](https://github.com/googleapis/release-please)
+reads the conventional commits on `main` (`feat:`, `fix:`, `feat!:`) and keeps one release
+pull request open. That pull request holds the next version and its `CHANGELOG.md` entry.
+It merges itself when CI is green. The merge tags the version, and Packagist reads the tag.
 
-The workflow runs the three checks again, renames `## Unreleased` to the new version with
-today's date, commits that to `main`, tags it, creates the GitHub Release with that section
-as its notes, and waits until Packagist serves the new version. It stops before it changes
-anything when a check is red or when `## Unreleased` is missing or empty.
+release-please chooses the version from the commit types since the last release. A `fix:`
+raises the patch number, a `feat:` raises the minor number, and a `feat!:` or a
+`BREAKING CHANGE:` line in the body raises the major number. Nobody sets the version by hand.
+
+Write commit titles in the conventional form, because they become the changelog.
+
+A new Puntjes API spec reaches this repository as a regenerate pull request. The
+`Regenerate` workflow opens it on the branch `regenerate/<tag>` and closes the open ones for
+older tags. A minor or patch one merges itself when CI is green. A major one asks
+`@cedricdhooge96` for a review and waits. The new pull request is a major too when it
+replaces an open major one, or when `spec/SOURCE` on `main` has a lower major version.
+The workflow checks out without keeping a token, so its check for an existing branch
+(`git ls-remote origin`) works only while this repository is public.
+
+Three cases need a person:
+
+- **The workflow fails.** It opens the issue "Regenerate failed", or comments on it when it
+  is open. Read the run, fix the cause, and re-run it. The re-run picks up where the run
+  stopped.
+- **A regenerate pull request has red CI.** It stays open and does not merge. No issue
+  tells you, so check the open `regenerate/*` pull requests after each Puntjes release.
+- **A major regenerate pull request waits for its review.**
+
+## Versions
+
+2.x is the current line. 1.x gets security fixes for 6 months after 2.0.0 reaches Packagist,
+on the `1.x` branch. Moving from 1.x is described in [`UPGRADING.md`](UPGRADING.md).
 
 ## Links
 
-- Changelog — [`CHANGELOG.md`](CHANGELOG.md)
-- API documentation — <https://docs.puntjes.app>
-- OpenAPI spec — `{your Puntjes host}/docs/api.json`
+- Changelog: [`CHANGELOG.md`](CHANGELOG.md)
+- Upgrading from 1.x: [`UPGRADING.md`](UPGRADING.md)
+- API documentation: <https://docs.puntjes.app>
+- OpenAPI spec: `{your Puntjes host}/docs/api.json`
 
 ## License
 

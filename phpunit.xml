@@ -20,8 +20,8 @@
         </include>
     </source>
     <php>
-        <!-- Set PUNTJES_BASE_URL / PUNTJES_CLIENT_ID / PUNTJES_CLIENT_SECRET to run
-             tests/Contract against a live Puntjes instance. Skipped when unset. -->
+        <!-- tests/Contract runs against a local Puntjes app only. Set PUNTJES_BASE_URL, PUNTJES_CLIENT_ID and
+             PUNTJES_CLIENT_SECRET. When they are unset the suite fails: a refusal is a failure, never a skip. -->
         <env name="PUNTJES_BASE_URL" value=""/>
     </php>
 </phpunit>

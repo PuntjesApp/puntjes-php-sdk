@@ -75,66 +75,32 @@ final class Transport
         };
     }
 
-    /** @param array<string, mixed> $query */
-    public function get(string $path, array $query = []): Response
-    {
-        return $this->request('GET', $path, $query);
-    }
-
     /**
-     * @param  array<string, mixed>  $body
-     * @param  array<string, mixed>  $query
-     */
-    public function post(string $path, array $body = [], array $query = []): Response
-    {
-        return $this->request('POST', $path, $query, $body);
-    }
-
-    /** @param array<string, mixed> $body */
-    public function put(string $path, array $body = []): Response
-    {
-        return $this->request('PUT', $path, [], $body);
-    }
-
-    /** @param array<string, mixed> $body */
-    public function patch(string $path, array $body = []): Response
-    {
-        return $this->request('PATCH', $path, [], $body);
-    }
-
-    public function delete(string $path): Response
-    {
-        return $this->request('DELETE', $path);
-    }
-
-    /**
-     * Send an authenticated API request.
+     * Sends a request built elsewhere, the generated client's, under the same token, retry and error rules.
      *
-     * @param  array<string, mixed>  $query
-     * @param  array<string, mixed>|null  $body  Encoded as JSON when present.
      * @param  array<string, string>  $headers
+     * @param  bool  $authenticate  False for an operation the spec makes public: no token, and a 401 is not re-granted
      *
      * @throws ApiException|TransportException
      */
-    public function request(
-        string $method,
-        string $path,
-        array $query = [],
-        ?array $body = null,
-        array $headers = [],
-    ): Response {
+    public function sendRaw(string $method, string $url, array $headers, ?string $body, bool $authenticate = true): Response
+    {
         $method = strtoupper($method);
-        $url = $this->config->apiUrl($path);
-        $encodedBody = $body === null ? null : json_encode($body, JSON_THROW_ON_ERROR);
-        $retryable = self::isRetryable($method, $body);
+        $decoded = $body === null || $body === '' ? null : json_decode($body, true);
 
+        return $this->send($method, $url, $body === '' ? null : $body, self::isRetryable($method, is_array($decoded) ? $decoded : null), $headers, $authenticate);
+    }
+
+    /** @param array<string, string> $headers */
+    private function send(string $method, string $url, ?string $encodedBody, bool $retryable, array $headers, bool $authenticate): Response
+    {
         $attempt = 0;
         $tokenRefreshed = false;
         $forceRefresh = false;
 
         while (true) {
             try {
-                $token = $this->tokens->token(forceRefresh: $forceRefresh);
+                $token = $authenticate ? $this->tokens->token(forceRefresh: $forceRefresh) : null;
                 $forceRefresh = false;
             } catch (TransportException|ServerException|RateLimitException $e) {
                 // The grant failed before the actual request was ever sent, so a retry
@@ -154,16 +120,14 @@ final class Transport
 
             $requestHeaders = array_merge(
                 $this->config->defaultHeaders,
-                [
-                    'Accept' => 'application/json',
-                    'Authorization' => $token->authorizationHeader(),
-                ],
-                $encodedBody === null ? [] : ['Content-Type' => 'application/json'],
+                ['Accept' => 'application/json'],
+                $token === null ? [] : ['Authorization' => $token->authorizationHeader()],
+                $encodedBody === null || self::hasHeader($headers, 'Content-Type') ? [] : ['Content-Type' => 'application/json'],
                 $headers,
             );
 
             try {
-                $response = $this->http->send($method, $url, $query, $requestHeaders, $encodedBody);
+                $response = $this->http->send($method, $url, [], $requestHeaders, $encodedBody);
             } catch (TransportException $e) {
                 // No response at all. Safe to replay only if the call itself is replay-safe:
                 // the request may well have been processed before the connection dropped.
@@ -186,7 +150,7 @@ final class Transport
             // the request was rejected before reaching any business logic. The refresh
             // itself happens at the top of the loop, inside the guarded path, so a
             // transient failure during the re-grant is retried too.
-            if ($response->status === 401 && ! $tokenRefreshed) {
+            if ($response->status === 401 && $authenticate && ! $tokenRefreshed) {
                 $tokenRefreshed = true;
                 $forceRefresh = true;
 
@@ -204,6 +168,18 @@ final class Transport
 
             throw $exception;
         }
+    }
+
+    /** @param array<string, string> $headers */
+    private static function hasHeader(array $headers, string $name): bool
+    {
+        foreach (array_keys($headers) as $key) {
+            if (strcasecmp((string) $key, $name) === 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -9,11 +9,13 @@ use Puntjes\Exception\PlanLimitExceededException;
 use Puntjes\Exception\RateLimitException;
 use Puntjes\Exception\ServerException;
 use Puntjes\Exception\TransportException;
-use Puntjes\Request\AdjustWallet;
-use Puntjes\Request\CreateCustomer;
-use Puntjes\Request\CreateIdentifier;
-use Puntjes\Request\CreateRewardFromProduct;
-use Puntjes\Request\SubmitTransaction;
+use Puntjes\Generated\Models\AdjustWalletApiData;
+use Puntjes\Generated\Models\CreateCustomerData;
+use Puntjes\Generated\Models\CreateIdentifierData;
+use Puntjes\Generated\Models\CreateIdentifierData_type;
+use Puntjes\Generated\Models\CreateRewardFromProductData;
+use Puntjes\Generated\Models\CreateTransactionData;
+use Puntjes\IdempotencyKey;
 use Puntjes\Tests\Support\TestCase;
 
 /**
@@ -27,9 +29,9 @@ final class RetryTest extends TestCase
         $this->fake->queueError(500, 'INTERNAL_ERROR');
         $this->fake->queueData(['display_name' => 'Bakkerij Jan']);
 
-        $branding = $this->puntjes()->me();
+        $branding = $this->puntjes()->me()->get()->wait()->getData();
 
-        self::assertSame('Bakkerij Jan', $branding->displayName);
+        self::assertSame('Bakkerij Jan', $branding->getDisplayName());
         self::assertSame([0.5], $this->sleeps);
     }
 
@@ -38,7 +40,7 @@ final class RetryTest extends TestCase
         $this->fake->queueNetworkFailure();
         $this->fake->queueData(['display_name' => 'Bakkerij Jan']);
 
-        self::assertSame('Bakkerij Jan', $this->puntjes()->me()->displayName);
+        self::assertSame('Bakkerij Jan', $this->puntjes()->me()->get()->wait()->getData()->getDisplayName());
     }
 
     public function test_retries_back_off_exponentially_and_then_give_up(): void
@@ -50,7 +52,7 @@ final class RetryTest extends TestCase
         $this->expectException(ServerException::class);
 
         try {
-            $this->puntjes(maxRetries: 2)->me();
+            $this->puntjes(maxRetries: 2)->me()->get()->wait();
         } finally {
             self::assertSame([0.5, 1.0], $this->sleeps);
         }
@@ -61,7 +63,7 @@ final class RetryTest extends TestCase
         $this->fake->queueError(429, 'RATE_LIMITED', 'Too many requests.', headers: ['Retry-After' => '7']);
         $this->fake->queueData(['display_name' => 'Bakkerij Jan']);
 
-        $this->puntjes()->me();
+        $this->puntjes()->me()->get()->wait();
 
         self::assertSame([7.0], $this->sleeps);
     }
@@ -75,7 +77,7 @@ final class RetryTest extends TestCase
         $this->expectException(PlanLimitExceededException::class);
 
         try {
-            $puntjes->transactions->submit(new SubmitTransaction(identifier: 'CARD-1', totalAmount: 4200));
+            $puntjes->transactions()->post(self::transaction('CARD-1', 4200))->wait();
         } finally {
             // Token grant + the one attempt. No retry: waiting cannot clear a billing stop.
             self::assertSame(2, $this->fake->requestCount());
@@ -97,13 +99,9 @@ final class RetryTest extends TestCase
             'items' => [],
         ], 201);
 
-        $transaction = $this->puntjes()->transactions->submit(new SubmitTransaction(
-            identifier: 'CARD-1',
-            totalAmount: 4200,
-            idempotencyKey: 'order-77',
-        ));
+        $transaction = $this->puntjes()->transactions()->post(self::transaction('CARD-1', 4200, 'order-77'))->wait()->getData();
 
-        self::assertSame(42, $transaction->pointsEarned);
+        self::assertSame(42, $transaction->getPointsEarned());
         self::assertSame([0.5], $this->sleeps);
     }
 
@@ -112,9 +110,9 @@ final class RetryTest extends TestCase
         $this->fake->queueError(500, 'INTERNAL_ERROR');
         $this->fake->queueData(['id' => 1, 'wallet_id' => 2, 'type' => 'adjust', 'amount' => 50, 'running_balance' => 150, 'created_at' => '2026-07-30T10:00:00+00:00']);
 
-        // No key supplied — the SDK generates one, and reusing it across the retry is
-        // exactly what stops the replay from moving the balance twice.
-        $this->puntjes()->wallets->adjust(9, new AdjustWallet(50, 'Goodwill'));
+        // One key from IdempotencyKey::new(), and reusing it across the retry is exactly
+        // what stops the replay from moving the balance twice.
+        $this->puntjes()->customers()->byCustomer('9')->wallet()->adjust()->post(self::adjustment(50, 'Goodwill'))->wait();
 
         $first = $this->fake->bodyAt(1)['idempotency_key'] ?? null;
         $second = $this->fake->bodyAt(2)['idempotency_key'] ?? null;
@@ -138,12 +136,9 @@ final class RetryTest extends TestCase
             'is_unlimited' => true,
         ], 201);
 
-        $reward = $this->puntjes()->products->createReward('SKU-1', new CreateRewardFromProduct(
-            pointCost: 200,
-            idempotencyKey: 'reward-sku-1',
-        ));
+        $reward = $this->puntjes()->products()->byExternalId('SKU-1')->reward()->post(self::reward(200, 'reward-sku-1'))->wait()->getData();
 
-        self::assertSame(3, $reward->id);
+        self::assertSame(3, $reward->getId());
         self::assertSame([0.5], $this->sleeps);
         self::assertSame('reward-sku-1', $this->fake->bodyAt(1)['idempotency_key']);
         self::assertSame('reward-sku-1', $this->fake->bodyAt(2)['idempotency_key']);
@@ -160,7 +155,7 @@ final class RetryTest extends TestCase
         $this->expectException(ServerException::class);
 
         try {
-            $puntjes->products->createReward('SKU-1', new CreateRewardFromProduct(pointCost: 200));
+            $puntjes->products()->byExternalId('SKU-1')->reward()->post(self::reward(200))->wait();
         } finally {
             self::assertSame(1, $this->fake->apiRequestCount());
             self::assertSame([], $this->sleeps);
@@ -176,9 +171,7 @@ final class RetryTest extends TestCase
         $this->expectException(ServerException::class);
 
         try {
-            $puntjes->customers->register(new CreateCustomer(
-                identifiers: [CreateIdentifier::loyaltyCard('B3H9RT5W')],
-            ));
+            $puntjes->customers()->post(self::loyaltyCardCustomer('B3H9RT5W'))->wait();
         } finally {
             // Registering twice would create two customers, so one attempt only.
             self::assertSame(2, $this->fake->requestCount());
@@ -196,7 +189,7 @@ final class RetryTest extends TestCase
 
         try {
             // A replay would burn the code and answer CODE_ALREADY_USED.
-            $puntjes->redemptions->verify('ABC-123');
+            $puntjes->redemptions()->byCode('ABC-123')->verify()->post()->wait();
         } finally {
             self::assertSame(2, $this->fake->requestCount());
         }
@@ -207,7 +200,7 @@ final class RetryTest extends TestCase
         $this->fake->queueError(500, 'INTERNAL_ERROR');
         $this->fake->queueRaw(204, '');
 
-        $this->puntjes()->products->delete('SKU-1');
+        $this->puntjes()->products()->byExternalId('SKU-1')->delete()->wait();
 
         self::assertSame([0.5], $this->sleeps);
     }
@@ -219,7 +212,7 @@ final class RetryTest extends TestCase
         $puntjes = $this->puntjes();
 
         try {
-            $puntjes->wallets->adjust(9, new AdjustWallet(-500, 'Correction'));
+            $puntjes->customers()->byCustomer('9')->wallet()->adjust()->post(self::adjustment(-500, 'Correction'))->wait();
             self::fail('Expected an ApiException.');
         } catch (ApiException $e) {
             self::assertSame('INSUFFICIENT_BALANCE', $e->code());
@@ -236,7 +229,7 @@ final class RetryTest extends TestCase
         $this->expectException(ServerException::class);
 
         try {
-            $puntjes->me();
+            $puntjes->me()->get()->wait();
         } finally {
             self::assertSame([], $this->sleeps);
         }
@@ -249,7 +242,7 @@ final class RetryTest extends TestCase
         $this->fake->queueRaw(502, '<html><body>Bad Gateway</body></html>', ['Content-Type' => 'text/html']);
         $this->fake->queueData(['display_name' => 'Bakkerij Jan']);
 
-        self::assertSame('Bakkerij Jan', $this->puntjes()->me()->displayName);
+        self::assertSame('Bakkerij Jan', $this->puntjes()->me()->get()->wait()->getData()->getDisplayName());
         self::assertSame([0.5], $this->sleeps);
     }
 
@@ -261,7 +254,7 @@ final class RetryTest extends TestCase
 
         $this->expectException(TransportException::class);
 
-        $this->puntjes(maxRetries: 2)->me();
+        $this->puntjes(maxRetries: 2)->me()->get()->wait();
     }
 
     public function test_a_rate_limit_exposes_retry_after_when_it_finally_gives_up(): void
@@ -271,10 +264,50 @@ final class RetryTest extends TestCase
         $puntjes = $this->puntjes(maxRetries: 0);
 
         try {
-            $puntjes->me();
+            $puntjes->me()->get()->wait();
             self::fail('Expected a RateLimitException.');
         } catch (RateLimitException $e) {
             self::assertSame(30, $e->retryAfter());
         }
+    }
+
+    private static function transaction(string $identifier, int $totalAmount, ?string $idempotencyKey = null): CreateTransactionData
+    {
+        $body = new CreateTransactionData;
+        $body->setIdentifier($identifier);
+        $body->setTotalAmount($totalAmount);
+        $body->setIdempotencyKey($idempotencyKey);
+
+        return $body;
+    }
+
+    private static function adjustment(int $amount, string $reason): AdjustWalletApiData
+    {
+        $body = new AdjustWalletApiData;
+        $body->setAmount($amount);
+        $body->setReason($reason);
+        $body->setIdempotencyKey(IdempotencyKey::new());
+
+        return $body;
+    }
+
+    private static function reward(int $pointCost, ?string $idempotencyKey = null): CreateRewardFromProductData
+    {
+        $body = new CreateRewardFromProductData;
+        $body->setPointCost($pointCost);
+        $body->setIdempotencyKey($idempotencyKey);
+
+        return $body;
+    }
+
+    private static function loyaltyCardCustomer(string $card): CreateCustomerData
+    {
+        $identifier = new CreateIdentifierData;
+        $identifier->setType(new CreateIdentifierData_type(CreateIdentifierData_type::LOYALTY_CARD));
+        $identifier->setValue($card);
+        $body = new CreateCustomerData;
+        $body->setIdentifiers([$identifier]);
+
+        return $body;
     }
 }

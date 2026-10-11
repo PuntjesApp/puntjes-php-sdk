@@ -6,510 +6,466 @@ namespace Puntjes\Tests\Contract;
 
 use PHPUnit\Framework\TestCase;
 use Puntjes\Auth\AccessToken;
-use Puntjes\Auth\TokenProvider;
-use Puntjes\Config;
-use Puntjes\Enum\ErrorCode;
-use Puntjes\Enum\Period;
-use Puntjes\Enum\ProductStatus;
-use Puntjes\Enum\RewardType;
-use Puntjes\Exception\ApiException;
+use Puntjes\Auth\InMemoryTokenStore;
+use Puntjes\Auth\TokenStore;
 use Puntjes\Exception\AuthenticationException;
-use Puntjes\Exception\ConflictException;
 use Puntjes\Exception\NotFoundException;
 use Puntjes\Exception\ValidationException;
-use Puntjes\Model\Branch;
+use Puntjes\Generated\Customers\Lookup\LookupRequestBuilderGetRequestConfiguration;
+use Puntjes\Generated\Errors\ErrorCode;
+use Puntjes\Generated\Models;
+use Puntjes\Generated\Products\Batch\BatchPostRequestBody;
+use Puntjes\Generated\Products\ProductsRequestBuilderGetRequestConfiguration;
+use Puntjes\Generated\PuntjesClient;
 use Puntjes\Puntjes;
-use Puntjes\Request\CreateProduct;
-use Puntjes\Request\CreateRewardFromProduct;
-use Puntjes\Request\ProductFilters;
-use Puntjes\Request\UpdateProduct;
-use Puntjes\Request\UpsertProduct;
+use Puntjes\Tests\Contract\Support\Live;
+use Puntjes\WalletPass;
 
 /**
- * Runs the SDK against a real Puntjes instance.
- *
- * Unit tests prove the SDK behaves correctly against fixtures the SDK's own author
- * wrote — which is exactly the blind spot that lets a wrong assumption about the
- * wire format ship. These tests close it.
- *
- * Skipped unless all three variables are set:
- *
- *     PUNTJES_BASE_URL=http://localhost \
- *     PUNTJES_CLIENT_ID=… PUNTJES_CLIENT_SECRET=… \
- *     vendor/bin/phpunit --testsuite Contract
- *
- * Everything written here is a product with a test-run-unique SKU, deleted in
- * tearDownAfterClass whether or not the tests passed. No customer, transaction or
- * points data is created — those cannot be deleted through the API, and a contract
- * test has no business leaving balances behind in someone's database.
+ * Calls all 34 operations through the generated 2.0 client, built the way a consumer builds it.
  */
 final class LiveApiTest extends TestCase
 {
-    private static ?Puntjes $client = null;
+    private const CLIENT = 'generated';
 
-    /** @var array<int, string> SKUs created by this run, deleted afterwards. */
-    private static array $createdSkus = [];
+    /** @var array<string, int|string> */
+    private static array $state = [];
 
-    private static string $prefix = '';
+    private static ?TokenStore $sharedStore = null;
 
-    public static function setUpBeforeClass(): void
+    private static function client(?TokenStore $tokenStore = null, ?string $secret = null): PuntjesClient
     {
-        // Unique per run so parallel runs against one instance cannot collide.
-        self::$prefix = 'sdk-contract-'.bin2hex(random_bytes(4));
+        $tokenStore ??= $secret === null ? (self::$sharedStore ??= new InMemoryTokenStore) : null;
+
+        return Puntjes::make(
+            (string) getenv('PUNTJES_CLIENT_ID'),
+            $secret ?? (string) getenv('PUNTJES_CLIENT_SECRET'),
+            (string) preg_replace('#/api/v1$#', '', Live::baseUrl()),
+            $tokenStore,
+            maxRetries: 0,
+        );
     }
 
     public static function tearDownAfterClass(): void
     {
-        // Unconditional: runs even when a test failed part-way through.
-        foreach (self::$createdSkus as $sku) {
+        foreach (['a', 'b', 'c'] as $suffix) {
             try {
-                self::$client?->products->delete($sku);
+                self::client()->products()->byExternalId(self::sku($suffix))->delete()->wait();
             } catch (\Throwable) {
-                // Already gone, or the run never authenticated. Nothing to undo.
+                continue;
             }
         }
-
-        self::$createdSkus = [];
-        self::$client = null;
     }
 
-    private function puntjes(): Puntjes
+    private static function sku(string $suffix): string
     {
-        $baseUrl = getenv('PUNTJES_BASE_URL') ?: '';
-        $clientId = getenv('PUNTJES_CLIENT_ID') ?: '';
-        $clientSecret = getenv('PUNTJES_CLIENT_SECRET') ?: '';
-
-        if ($baseUrl === '' || $clientId === '' || $clientSecret === '') {
-            self::markTestSkipped('Set PUNTJES_BASE_URL, PUNTJES_CLIENT_ID and PUNTJES_CLIENT_SECRET to run the contract suite.');
-        }
-
-        return self::$client ??= Puntjes::make(
-            clientId: $clientId,
-            clientSecret: $clientSecret,
-            baseUrl: $baseUrl,
-        );
+        return Live::runId().'-'.$suffix;
     }
 
-    /** Register a SKU for cleanup before creating it, so a mid-call failure still tidies up. */
-    private function sku(string $suffix): string
+    private static function email(string $suffix): string
     {
-        $sku = self::$prefix.'-'.$suffix;
-        self::$createdSkus[] = $sku;
-
-        return $sku;
+        return Live::runId().'-'.$suffix.'@example.test';
     }
 
-    public function test_the_health_endpoint_answers(): void
+    private static function customer(): string
     {
-        self::assertTrue($this->puntjes()->ping());
+        return (string) self::$state['customer'];
     }
 
-    public function test_the_client_credentials_grant_works_end_to_end(): void
+    public function test_check_health(): void
     {
-        $branding = $this->puntjes()->me();
-
-        self::assertNotSame('', $branding->displayName);
+        self::assertNotNull(self::client()->health()->get()->wait());
+        Live::hit(self::CLIENT, 'checkHealth');
     }
 
-    public function test_a_token_the_api_cannot_read_is_unauthenticated_after_one_regrant(): void
+    public function test_show_me(): void
     {
-        $this->puntjes();
+        self::assertNotSame('', self::client()->me()->get()->wait()->getData()->getDisplayName());
+        Live::hit(self::CLIENT, 'showMe');
+    }
 
-        $tokens = new class implements TokenProvider
+    public function test_a_token_the_api_cannot_read_is_regranted_once_and_the_call_succeeds(): void
+    {
+        $store = new class implements TokenStore
         {
-            public int $calls = 0;
+            public int $puts = 0;
 
-            public function token(bool $forceRefresh = false): AccessToken
+            public int $forgets = 0;
+
+            private bool $seeded = false;
+
+            private InMemoryTokenStore $inner;
+
+            public function __construct()
             {
-                $this->calls++;
+                $this->inner = new InMemoryTokenStore;
+            }
 
-                return new AccessToken('not-a-token-'.bin2hex(random_bytes(4)), time() + 3600);
+            public function get(string $key): ?AccessToken
+            {
+                if (! $this->seeded) {
+                    $this->seeded = true;
+
+                    return new AccessToken('not-a-token', time() + 3600);
+                }
+
+                return $this->inner->get($key);
+            }
+
+            public function put(string $key, AccessToken $token, int $ttl): void
+            {
+                $this->puts++;
+                $this->inner->put($key, $token, $ttl);
+            }
+
+            public function forget(string $key): void
+            {
+                $this->forgets++;
+                $this->inner->forget($key);
             }
         };
 
-        $puntjes = Puntjes::fromConfig(
-            new Config('unused', 'unused', (string) getenv('PUNTJES_BASE_URL'), maxRetries: 0),
-            tokenProvider: $tokens,
-        );
+        self::assertNotSame('', self::client($store)->me()->get()->wait()->getData()->getDisplayName());
+        self::assertSame(1, $store->forgets, 'The bad token is dropped once.');
+        self::assertSame(1, $store->puts, 'The transport grants exactly one new token.');
+    }
 
+    public function test_credentials_the_api_rejects_are_unauthenticated(): void
+    {
         try {
-            $puntjes->me();
+            self::client(null, 'not-the-secret')->me()->get()->wait();
             self::fail('Expected an AuthenticationException.');
         } catch (AuthenticationException $e) {
-            self::assertSame(ErrorCode::Unauthenticated, $e->errorCode());
             self::assertSame(401, $e->status());
         }
-
-        self::assertSame(2, $tokens->calls, 'The transport must ask for a new token exactly once.');
     }
 
-    public function test_an_unknown_customer_maps_to_a_not_found_exception(): void
+    public function test_show_statistics(): void
     {
-        try {
-            $this->puntjes()->customers->lookup(identifier: 'definitely-not-a-real-card-'.bin2hex(random_bytes(4)));
-            self::fail('Expected a NotFoundException.');
-        } catch (NotFoundException $e) {
-            self::assertSame('CUSTOMER_NOT_FOUND', $e->code());
-            self::assertNotNull($e->requestId());
-        }
+        self::assertNotNull(self::client()->statistics()->get()->wait()->getData());
+        Live::hit(self::CLIENT, 'showStatistics');
     }
 
-    /**
-     * The drift this suite exists for, on the one field a unit fixture cannot police: a
-     * type the API sends that this SDK has no case for decodes to null, silently, and the
-     * unit fixtures cannot notice because the SDK author wrote them from the same
-     * assumption. `rawType` is what separates "the API sent something new" from "the API
-     * sent nothing".
-     *
-     * Read-only, and skipped unless someone names a customer. This suite deliberately
-     * creates no customer data, because the API cannot delete it again.
-     */
-    public function test_every_identifier_the_api_returns_has_a_type_this_sdk_knows(): void
+    public function test_list_campaigns_types_the_config_union(): void
     {
-        $identifier = getenv('PUNTJES_CONTRACT_CUSTOMER_IDENTIFIER') ?: '';
+        $campaigns = self::client()->campaigns()->get()->wait()->getData()->getData();
+        Live::hit(self::CLIENT, 'listCampaigns');
 
-        if ($identifier === '') {
-            self::markTestSkipped('Set PUNTJES_CONTRACT_CUSTOMER_IDENTIFIER to an existing customer identifier to run this.');
-        }
-
-        $customer = $this->puntjes()->customers->lookup(identifier: $identifier);
-
-        self::assertNotSame([], $customer->identifiers, 'The customer carries no identifiers to check.');
-
-        foreach ($customer->identifiers as $each) {
-            self::assertNotNull($each->type, "The API sent identifier type '{$each->rawType}', which this SDK has no case for.");
-        }
+        $moments = array_values(array_filter($campaigns, fn (Models\CampaignListData $c) => $c->getFamily() === 'customer_moment'));
+        self::assertNotEmpty($moments, 'The voucher fixture creates a customer-moment campaign');
+        self::assertInstanceOf(Models\MomentCampaignConfigData::class, $moments[0]->getConfig()->getMomentCampaignConfigData());
     }
 
-    /** Read-only, on the same named customer: `find()` decodes the detail shape and its flag. */
-    public function test_finding_a_customer_by_id_decodes_the_same_customer(): void
+    public function test_create_product(): void
     {
-        $identifier = getenv('PUNTJES_CONTRACT_CUSTOMER_IDENTIFIER') ?: '';
+        $body = new Models\CreateProductData;
+        $body->setExternalId(self::sku('a'));
+        $body->setName('Contract product A');
+        $body->setPriceCents(250);
+        $body->setCategory(Live::runId());
 
-        if ($identifier === '') {
-            self::markTestSkipped('Set PUNTJES_CONTRACT_CUSTOMER_IDENTIFIER to an existing customer identifier to run this.');
-        }
-
-        $looked = $this->puntjes()->customers->lookup(identifier: $identifier);
-        $found = $this->puntjes()->customers->find($looked->id);
-
-        self::assertSame($looked->id, $found->id);
-        self::assertSame($looked->isDeactivated, $found->isDeactivated);
-        self::assertNull($found->walletBalance, 'Only lookup() carries the wallet balance.');
+        self::assertSame(self::sku('a'), self::client()->products()->post($body)->wait()->getData()->getExternalId());
+        Live::hit(self::CLIENT, 'createProduct');
     }
 
-    public function test_find_by_identifier_returns_null_for_an_unknown_card(): void
+    public function test_a_validation_error_is_a_typed_error(): void
     {
-        self::assertNull(
-            $this->puntjes()->customers->findByIdentifier('unknown-'.bin2hex(random_bytes(4))),
-        );
-    }
-
-    public function test_the_reward_catalogue_decodes(): void
-    {
-        $rewards = $this->puntjes()->rewards->list();
-
-        foreach ($rewards as $reward) {
-            self::assertGreaterThan(0, $reward->pointCost);
-            self::assertNotNull($reward->type, 'Unknown reward type on the wire: '.$reward->rawType);
-            self::assertSame($reward->totalStock === null, $reward->isUnlimited);
-
-            if ($reward->isUnlimited) {
-                self::assertSame(0, $reward->remainingStock);
-            }
-
-            // Null means redeemable anywhere; a list means limited to those shops. An
-            // empty list is a third thing again and must survive the round trip.
-            foreach ($reward->branches ?? [] as $branch) {
-                self::assertNotSame('', $branch->externalId);
-                self::assertNotNull($branch->type, 'Unknown branch type on the wire: '.$branch->rawType);
-            }
-        }
-
-        self::assertIsArray($rewards);
-    }
-
-    public function test_every_discount_in_the_catalogue_names_a_kind_this_sdk_knows(): void
-    {
-        self::markTestSkipped('Needs Puntjes PR #1114 deployed');
-
-        foreach ($this->puntjes()->rewards->list() as $reward) {
-            if ($reward->type === RewardType::Discount) {
-                self::assertTrue($reward->isPercentageDiscount() || $reward->isFixedAmountDiscount(), 'Unknown discount type: '.$reward->discountType);
-                self::assertNotNull($reward->discountValue);
-            } else {
-                self::assertNull($reward->discountType);
-                self::assertNull($reward->discountValue);
-            }
-        }
-
-        self::assertTrue(true);
-    }
-
-    public function test_every_limit_per_customer_in_the_catalogue_is_at_least_one(): void
-    {
-        self::markTestSkipped('Needs Puntjes PR #1171 deployed');
-
-        foreach ($this->puntjes()->rewards->list() as $reward) {
-            self::assertNull($reward->customerRedemptions, 'No customer was named, so nothing is counted.');
-
-            if ($reward->maxRedemptionsPerCustomer !== null) {
-                self::assertGreaterThanOrEqual(1, $reward->maxRedemptionsPerCustomer);
-            }
-        }
-
-        self::assertTrue(true);
-    }
-
-    public function test_campaigns_paginate(): void
-    {
-        $page = $this->puntjes()->campaigns->list()->firstPage();
-
-        self::assertGreaterThanOrEqual(1, $page->meta->currentPage);
-        self::assertGreaterThanOrEqual(0, $page->meta->total);
-
-        foreach ($page->items as $campaign) {
-            // A customer-moment campaign carries none of the three, which is the shape
-            // that crashed an SDK typing them as always-present.
-            self::assertNotSame('', $campaign->family);
-
-            foreach ($campaign->branches ?? [] as $branch) {
-                self::assertNotSame('', $branch->externalId);
-            }
-        }
-    }
-
-    public function test_campaigns_can_be_filtered_to_the_unassigned_bucket(): void
-    {
-        // `none` is the one branch key valid on every instance, whatever shops the
-        // vendor has, so it is the only filter a contract test can assert on.
-        $page = $this->puntjes()->campaigns->list(branch: Branch::UNASSIGNED)->firstPage();
-
-        self::assertGreaterThanOrEqual(0, $page->meta->total);
-    }
-
-    public function test_statistics_decode_the_full_envelope(): void
-    {
-        $stats = $this->puntjes()->statistics->get(Period::ThirtyDays, topProductsLimit: 5);
-
-        self::assertSame(Period::ThirtyDays, $stats->period->preset);
-        self::assertSame('Europe/Brussels', $stats->period->timezone);
-        self::assertNotNull($stats->period->granularity, 'Unknown granularity on the wire.');
-        self::assertGreaterThanOrEqual(0, $stats->commerce->orders);
-        // Present exactly because this call names no branch.
-        self::assertNotNull($stats->loyalty);
-        self::assertGreaterThanOrEqual(0, $stats->loyalty->pointsIssued);
-    }
-
-    public function test_a_branch_filtered_report_drops_the_loyalty_block(): void
-    {
-        $stats = $this->puntjes()->statistics->get(Period::ThirtyDays, branch: Branch::UNASSIGNED);
-
-        // Not an omission: neither points liability nor breakage can be attributed to
-        // one shop, so the API refuses to print a vendor-wide number under a branch
-        // label. An SDK typing this as always-present crashes here.
-        self::assertNull($stats->loyalty);
-        self::assertGreaterThanOrEqual(0, $stats->commerce->orders);
-    }
-
-    public function test_an_unknown_branch_key_is_refused_rather_than_ignored(): void
-    {
-        try {
-            $this->puntjes()->statistics->get(
-                Period::ThirtyDays,
-                branch: 'sdk-contract-'.bin2hex(random_bytes(4)),
-            );
-            self::fail('A mistyped branch key must be refused, not answered vendor-wide.');
-        } catch (ApiException $e) {
-            self::assertSame(ErrorCode::BranchNotFound, $e->errorCode());
-            self::assertSame(422, $e->status());
-        }
-    }
-
-    public function test_an_unissued_voucher_code_is_not_found(): void
-    {
-        // Verifying is a consume, so the only code a contract test may send is one that
-        // cannot exist. This still pins the route, the error code and the status.
-        try {
-            $this->puntjes()->vouchers->verify('SDKCONTRACT'.bin2hex(random_bytes(4)));
-            self::fail('An unissued voucher code must not verify.');
-        } catch (NotFoundException $e) {
-            self::assertSame('VOUCHER_NOT_FOUND', $e->code());
-        }
-    }
-
-    public function test_looking_up_an_unissued_voucher_code_is_not_found(): void
-    {
-        self::markTestSkipped('Needs Puntjes PR #1073 deployed');
+        $body = new Models\CreateProductData;
+        $body->setExternalId(self::sku('invalid'));
+        $body->setName('');
 
         try {
-            $this->puntjes()->vouchers->find('SDKCONTRACT'.bin2hex(random_bytes(4)));
-            self::fail('An unissued voucher code must not be found.');
-        } catch (NotFoundException $e) {
-            self::assertSame('VOUCHER_NOT_FOUND', $e->code());
-        }
-    }
-
-    public function test_the_open_vouchers_of_an_unknown_customer_are_not_found(): void
-    {
-        self::markTestSkipped('Needs Puntjes PR #1111 deployed');
-
-        try {
-            $this->puntjes()->vouchers->forCustomer(PHP_INT_MAX);
-            self::fail('An unknown customer must not have a voucher list.');
-        } catch (NotFoundException $e) {
-            self::assertSame('CUSTOMER_NOT_FOUND', $e->code());
-        }
-    }
-
-    public function test_linking_an_unknown_identifier_is_not_found(): void
-    {
-        // Nothing is written: the customer lookup fails before any link is attempted.
-        try {
-            $this->puntjes()->customers->linkExternalId(
-                'sdk-contract-'.bin2hex(random_bytes(4)),
-                'sdk-contract-'.bin2hex(random_bytes(4)),
-            );
-            self::fail('Linking an unknown identifier must not succeed.');
-        } catch (NotFoundException $e) {
-            self::assertSame('CUSTOMER_NOT_FOUND', $e->code());
-        }
-    }
-
-    public function test_sending_a_card_to_an_unknown_external_id_is_not_found(): void
-    {
-        // A random external id cannot collide with a real customer, so no mail can be
-        // queued by this test.
-        try {
-            $this->puntjes()->customers->sendCardByExternalId('sdk-contract-'.bin2hex(random_bytes(4)));
-            self::fail('Sending a card to an unknown external id must not succeed.');
-        } catch (NotFoundException $e) {
-            self::assertNotNull($e->requestId());
-        }
-    }
-
-    public function test_the_product_lifecycle(): void
-    {
-        $products = $this->puntjes()->products;
-        $sku = $this->sku('lifecycle');
-
-        $created = $products->create(new CreateProduct(
-            externalId: $sku,
-            name: 'SDK contract test product',
-            priceCents: 250,
-            category: 'SDK Tests',
-            stock: 10,
-        ));
-
-        self::assertSame($sku, $created->externalId);
-        self::assertSame(250, $created->priceCents);
-        self::assertSame(ProductStatus::Active, $created->status);
-
-        // Creating the same SKU again is a 409, distinguishable from other failures.
-        try {
-            $products->create(new CreateProduct(externalId: $sku, name: 'Duplicate'));
-            self::fail('Expected a ConflictException.');
-        } catch (ConflictException $e) {
-            self::assertSame('PRODUCT_EXTERNAL_ID_DUPLICATE', $e->code());
-        }
-
-        self::assertSame('SDK contract test product', $products->find($sku)->name);
-
-        // PATCH changes only what is named.
-        $patched = $products->update($sku, new UpdateProduct(priceCents: 275));
-        self::assertSame(275, $patched->priceCents);
-        self::assertSame('SDK contract test product', $patched->name);
-        self::assertSame('SDK Tests', $patched->category);
-
-        // PUT replaces: the omitted category must come back cleared.
-        $upserted = $products->upsert($sku, new UpsertProduct(name: 'Replaced', priceCents: 300));
-        self::assertFalse($upserted['created'], 'An existing SKU must upsert as an update, not a create.');
-        self::assertSame('Replaced', $upserted['product']->name);
-        self::assertNull($upserted['product']->category);
-
-        $products->delete($sku);
-
-        self::assertNull($products->findOrNull($sku));
-    }
-
-    /**
-     * Writes only a product. `pointCost: 0` is refused on every Puntjes version, so no
-     * reward is created even by a Puntjes that would accept the other two fields; the
-     * test then fails on the missing field names instead of leaving a reward behind.
-     */
-    public function test_a_reward_request_past_its_bounds_is_refused_field_by_field(): void
-    {
-        $sku = $this->sku('reward-bounds');
-        $this->puntjes()->products->upsert($sku, new UpsertProduct(name: 'SDK reward bounds'));
-
-        try {
-            $this->puntjes()->products->createReward($sku, new CreateRewardFromProduct(
-                pointCost: 0,
-                codeValidForHours: 87601,
-                idempotencyKey: str_repeat('k', 256),
-            ));
-            self::fail('Expected a ValidationException.');
+            self::client()->products()->post($body)->wait();
+            self::fail('No exception for a 422');
         } catch (ValidationException $e) {
-            self::assertNotSame([], $e->errorsFor('point_cost'));
-            self::assertNotSame([], $e->errorsFor('code_valid_for_hours'), 'The API must cap code validity at 87600 hours.');
-            self::assertNotSame([], $e->errorsFor('idempotency_key'), 'The API must read the idempotency key.');
+            self::assertSame(422, $e->status());
+            self::assertSame(ErrorCode::ValidationError, $e->errorCode());
         }
     }
 
-    public function test_upserting_a_new_sku_reports_it_as_created(): void
+    public function test_show_product(): void
     {
-        $sku = $this->sku('upsert-new');
-
-        $result = $this->puntjes()->products->upsert($sku, new UpsertProduct(
-            name: 'SDK contract upsert',
-            priceCents: 100,
-        ));
-
-        self::assertTrue($result['created'], 'A brand-new SKU must upsert as a create (HTTP 201).');
+        self::assertSame('Contract product A', self::client()->products()->byExternalId(self::sku('a'))->get()->wait()->getData()->getName());
+        Live::hit(self::CLIENT, 'showProduct');
     }
 
-    public function test_a_batch_upsert_reports_per_item_outcomes(): void
+    public function test_update_product(): void
     {
-        $good = $this->sku('batch-ok');
-        $bad = $this->sku('batch-bad');
+        $body = new Models\UpdateProductData;
+        $body->setName('Contract product A2');
 
-        $result = $this->puntjes()->products->batchUpsert([
-            $good => new UpsertProduct(name: 'SDK batch product', priceCents: 150),
-            // An empty name fails validation for this item alone; the batch still answers 200.
-            $bad => new UpsertProduct(name: ''),
-        ]);
-
-        self::assertSame(2, $result->total);
-        self::assertSame(1, $result->failed);
-        self::assertTrue($result->hasFailures());
-        self::assertSame($bad, $result->failures()[0]->externalId);
-        self::assertArrayHasKey('name', $result->failures()[0]->errors);
+        self::assertSame('Contract product A2', self::client()->products()->byExternalId(self::sku('a'))->patch($body)->wait()->getData()->getName());
+        Live::hit(self::CLIENT, 'updateProduct');
     }
 
-    public function test_listing_products_filters_and_paginates(): void
+    public function test_upsert_product(): void
     {
-        $sku = $this->sku('listed');
-        $this->puntjes()->products->upsert($sku, new UpsertProduct(
-            name: 'SDK listable product',
-            category: 'SDK Tests',
-        ));
+        $body = new Models\UpsertProductData;
+        $body->setName('Contract product B');
+        $body->setCategory(Live::runId());
 
-        $matches = $this->puntjes()->products
-            ->list(new ProductFilters(search: 'SDK listable', perPage: 5))
-            ->all();
-
-        $skus = array_map(static fn ($product): string => $product->externalId, $matches);
-
-        self::assertContains($sku, $skus);
+        self::assertSame(self::sku('b'), self::client()->products()->byExternalId(self::sku('b'))->put($body)->wait()->getData()->getExternalId());
+        Live::hit(self::CLIENT, 'upsertProduct');
     }
 
-    public function test_an_unknown_sku_is_a_not_found_exception(): void
+    public function test_list_products(): void
+    {
+        $config = new ProductsRequestBuilderGetRequestConfiguration(queryParameters: ProductsRequestBuilderGetRequestConfiguration::createQueryParameters(category: Live::runId()));
+
+        self::assertCount(2, self::client()->products()->get($config)->wait()->getData()->getData());
+        Live::hit(self::CLIENT, 'listProducts');
+    }
+
+    public function test_bulk_upsert_products(): void
+    {
+        $item = new Models\CreateProductData;
+        $item->setExternalId(self::sku('c'));
+        $item->setName('Contract product C');
+        $item->setCategory(Live::runId());
+        $body = new BatchPostRequestBody;
+        $body->setProducts([$item]);
+
+        self::assertSame(1, self::client()->products()->batch()->post($body)->wait()->getData()->getSummary()->getTotal());
+        Live::hit(self::CLIENT, 'bulkUpsertProducts');
+    }
+
+    public function test_create_reward_from_product(): void
+    {
+        $body = new Models\CreateRewardFromProductData;
+        $body->setPointCost(1);
+        $body->setIdempotencyKey(Live::runId().'-reward');
+
+        self::$state['reward'] = self::client()->products()->byExternalId(self::sku('a'))->reward()->post($body)->wait()->getData()->getId();
+        self::assertIsInt(self::$state['reward']);
+        Live::hit(self::CLIENT, 'createRewardFromProduct');
+    }
+
+    public function test_list_rewards(): void
+    {
+        $ids = array_map(fn ($r) => $r->getId(), self::client()->rewards()->get()->wait()->getData());
+
+        self::assertContains(self::$state['reward'], $ids);
+        Live::hit(self::CLIENT, 'listRewards');
+    }
+
+    public function test_register_customer(): void
+    {
+        $body = new Models\CreateCustomerData;
+        $body->setEmail(self::email('a'));
+        $body->setExternalId(self::sku('cust-a'));
+        $body->setFirstName('Contract');
+        $body->setPhone(null);
+
+        self::$state['customer'] = self::client()->customers()->post($body)->wait()->getData()->getId();
+        self::assertIsInt(self::$state['customer']);
+        Live::hit(self::CLIENT, 'registerCustomer');
+    }
+
+    public function test_show_customer_reads_the_nullable_fields(): void
+    {
+        $customer = self::client()->customers()->byCustomer(self::customer())->get()->wait()->getData();
+
+        self::assertSame(self::email('a'), $customer->getEmail());
+        self::assertNull($customer->getPhone());
+        self::assertNull($customer->getDeactivatedAt());
+        Live::hit(self::CLIENT, 'showCustomer');
+    }
+
+    public function test_an_unknown_customer_is_a_typed_not_found(): void
     {
         try {
-            $this->puntjes()->products->find('missing-'.bin2hex(random_bytes(4)));
-            self::fail('Expected a NotFoundException.');
+            self::client()->customers()->byCustomer('999999999')->get()->wait();
+            self::fail('No exception for a 404');
         } catch (NotFoundException $e) {
-            self::assertSame('PRODUCT_NOT_FOUND', $e->code());
+            self::assertSame('CUSTOMER_NOT_FOUND', $e->code());
         }
+    }
+
+    public function test_lookup_customer(): void
+    {
+        $config = new LookupRequestBuilderGetRequestConfiguration(queryParameters: LookupRequestBuilderGetRequestConfiguration::createQueryParameters(external_id: self::sku('cust-a')));
+
+        self::assertSame(self::$state['customer'], self::client()->customers()->lookup()->get($config)->wait()->getData()->getId());
+        Live::hit(self::CLIENT, 'lookupCustomer');
+    }
+
+    public function test_update_customer_by_external_id(): void
+    {
+        $body = new Models\UpdateCustomerData;
+        $body->setFirstName('Patched');
+
+        self::assertSame('Patched', self::client()->customers()->byExternalId()->byExternalId(self::sku('cust-a'))->patch($body)->wait()->getData()->getFirstName());
+        Live::hit(self::CLIENT, 'updateCustomerByExternalId');
+    }
+
+    public function test_replace_customer_by_external_id(): void
+    {
+        $body = new Models\UpdateCustomerData;
+        $body->setEmail(self::email('a'));
+        $body->setFirstName('Replaced');
+
+        self::assertSame('Replaced', self::client()->customers()->byExternalId()->byExternalId(self::sku('cust-a'))->put($body)->wait()->getData()->getFirstName());
+        Live::hit(self::CLIENT, 'replaceCustomerByExternalId');
+    }
+
+    public function test_link_customer_external_id(): void
+    {
+        $customer = new Models\CreateCustomerData;
+        $customer->setEmail(self::email('b'));
+        self::client()->customers()->post($customer)->wait();
+
+        $body = new Models\LinkExternalIdData;
+        $body->setIdentifier(self::email('b'));
+        $body->setExternalId(self::sku('cust-b'));
+
+        self::assertSame(self::sku('cust-b'), self::client()->customers()->linkExternalId()->post($body)->wait()->getData()->getExternalId());
+        Live::hit(self::CLIENT, 'linkCustomerExternalId');
+    }
+
+    public function test_submit_transaction(): void
+    {
+        $body = new Models\CreateTransactionData;
+        $body->setIdentifier(self::email('a'));
+        $body->setTotalAmount(1000);
+        $body->setIdempotencyKey(Live::runId().'-tx');
+
+        self::assertNotNull(self::client()->transactions()->post($body)->wait()->getData());
+        Live::hit(self::CLIENT, 'submitTransaction');
+    }
+
+    public function test_list_customer_transactions(): void
+    {
+        self::assertCount(1, self::client()->customers()->byCustomer(self::customer())->transactions()->get()->wait()->getData()->getData());
+        Live::hit(self::CLIENT, 'listCustomerTransactions');
+    }
+
+    public function test_adjust_wallet(): void
+    {
+        $body = new Models\AdjustWalletApiData;
+        $body->setAmount(50);
+        $body->setReason('contract');
+        $body->setIdempotencyKey(Live::runId().'-adjust');
+
+        self::assertNotNull(self::client()->customers()->byCustomer(self::customer())->wallet()->adjust()->post($body)->wait()->getData());
+        Live::hit(self::CLIENT, 'adjustWallet');
+    }
+
+    public function test_show_wallet(): void
+    {
+        self::assertGreaterThanOrEqual(50, self::client()->customers()->byCustomer(self::customer())->wallet()->get()->wait()->getData()->getBalance());
+        Live::hit(self::CLIENT, 'showWallet');
+    }
+
+    public function test_list_ledger_entries(): void
+    {
+        self::assertNotEmpty(self::client()->customers()->byCustomer(self::customer())->ledger()->get()->wait()->getData()->getData());
+        Live::hit(self::CLIENT, 'listLedgerEntries');
+    }
+
+    public function test_redeem_reward(): void
+    {
+        $body = new Models\CreateRedemptionData;
+        $body->setIdentifier(self::email('a'));
+        $body->setRewardId((int) self::$state['reward']);
+        $body->setIdempotencyKey(Live::runId().'-redeem');
+
+        self::$state['redemption'] = self::client()->redemptions()->post($body)->wait()->getData()->getConfirmationCode();
+        self::assertIsString(self::$state['redemption']);
+        Live::hit(self::CLIENT, 'redeemReward');
+    }
+
+    public function test_list_customer_redemptions(): void
+    {
+        self::assertCount(1, self::client()->customers()->byCustomer(self::customer())->redemptions()->get()->wait()->getData()->getData());
+        Live::hit(self::CLIENT, 'listCustomerRedemptions');
+    }
+
+    public function test_lookup_redemption(): void
+    {
+        self::assertNotNull(self::client()->redemptions()->byCode((string) self::$state['redemption'])->get()->wait()->getData());
+        Live::hit(self::CLIENT, 'lookupRedemption');
+    }
+
+    public function test_verify_redemption(): void
+    {
+        self::assertNotNull(self::client()->redemptions()->byCode((string) self::$state['redemption'])->verify()->post()->wait()->getData());
+        Live::hit(self::CLIENT, 'verifyRedemption');
+    }
+
+    public function test_list_customer_vouchers(): void
+    {
+        $vouchers = self::client()->customers()->byCustomer((string) Live::voucher()['customer'])->vouchers()->get()->wait()->getData();
+
+        self::assertContains(Live::voucher()['code'], array_map(fn ($v) => $v->getVoucherCode(), $vouchers));
+        Live::hit(self::CLIENT, 'listCustomerVouchers');
+    }
+
+    public function test_lookup_voucher_types_the_discount_union(): void
+    {
+        $voucher = self::client()->vouchers()->byCode(Live::voucher()['code'])->get()->wait()->getData();
+        Live::hit(self::CLIENT, 'lookupVoucher');
+
+        self::assertInstanceOf(Models\VoucherPercentageDiscountData::class, $voucher->getDiscount()->getVoucherPercentageDiscountData());
+    }
+
+    public function test_verify_voucher(): void
+    {
+        $body = new Models\VerifyCampaignVoucherData;
+        $body->setIdempotencyKey(Live::runId().'-voucher');
+
+        self::assertNotNull(self::client()->vouchers()->byCode(Live::voucher()['code'])->verify()->post($body)->wait()->getData());
+        Live::hit(self::CLIENT, 'verifyVoucher');
+    }
+
+    public function test_download_wallet_pass(): void
+    {
+        self::assertStringStartsWith('PK', (string) WalletPass::apple(self::client(), self::customer()));
+        Live::hit(self::CLIENT, 'downloadWalletPass');
+    }
+
+    public function test_send_loyalty_card_refusal_path(): void
+    {
+        $body = new Models\SendLoyaltyCardRequestData;
+        $body->setChannel(new Models\SendLoyaltyCardRequestData_channel('email'));
+
+        try {
+            self::client()->customers()->byCustomer('999999999')->sendCard()->post($body)->wait();
+            self::fail('No exception for a 404');
+        } catch (NotFoundException $e) {
+            self::assertSame('CUSTOMER_NOT_FOUND', $e->code());
+        }
+
+        Live::hit(self::CLIENT, 'sendLoyaltyCard');
+    }
+
+    public function test_send_loyalty_card_by_external_id_refusal_path(): void
+    {
+        $body = new Models\SendLoyaltyCardRequestData;
+
+        try {
+            self::client()->customers()->byExternalId()->byExternalId(self::sku('nobody'))->sendCard()->post($body)->wait();
+            self::fail('No exception for a 404');
+        } catch (NotFoundException $e) {
+            self::assertSame('EXTERNAL_ID_NOT_FOUND', $e->code());
+        }
+
+        Live::hit(self::CLIENT, 'sendLoyaltyCardByExternalId');
+    }
+
+    public function test_delete_product(): void
+    {
+        $products = self::client()->products();
+        $products->byExternalId(self::sku('a'))->delete()->wait();
+        $products->byExternalId(self::sku('b'))->delete()->wait();
+        $products->byExternalId(self::sku('c'))->delete()->wait();
+
+        $config = new ProductsRequestBuilderGetRequestConfiguration(queryParameters: ProductsRequestBuilderGetRequestConfiguration::createQueryParameters(category: Live::runId()));
+        self::assertCount(0, $products->get($config)->wait()->getData()->getData());
+        Live::hit(self::CLIENT, 'deleteProduct');
+    }
+
+    public function test_every_operation_was_called(): void
+    {
+        self::assertSame([], Live::missed(self::CLIENT));
     }
 }
