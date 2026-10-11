@@ -16,7 +16,7 @@
         "microsoft/kiota-serialization-json": "^1.5",
         "microsoft/kiota-serialization-text": "^1.5",
         "php-http/discovery": "^1.19",
-        "php-http/promise": "~1.2.0",
+        "php-http/promise": "^1.2",
         "psr/http-client": "^1.0",
         "psr/http-factory": "^1.0",
         "psr/http-message": "^1.1 || ^2.0"
