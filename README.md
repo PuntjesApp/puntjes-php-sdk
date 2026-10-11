@@ -354,7 +354,10 @@ Write commit titles in the conventional form, because they become the changelog.
 A new Puntjes API spec reaches this repository as a regenerate pull request. The
 `Regenerate` workflow opens it on the branch `regenerate/<tag>` and closes the open ones for
 older tags. A minor or patch one merges itself when CI is green. A major one asks
-`@cedricdhooge96` for a review and waits.
+`@cedricdhooge96` for a review and waits. The new pull request is a major too when it
+replaces an open major one, or when `spec/SOURCE` on `main` has a lower major version.
+The workflow checks out without keeping a token, so its check for an existing branch
+(`git ls-remote origin`) works only while this repository is public.
 
 Three cases need a person:
 

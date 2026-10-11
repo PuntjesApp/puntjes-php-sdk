@@ -89,4 +89,39 @@ final class DispatchPlanTest extends TestCase
         self::assertSame('false', $plan['skip']);
         self::assertSame('regenerate/v1.0.1 regenerate/v0.9.0', $plan['close']);
     }
+
+    public function test_closing_an_open_major_for_an_older_tag_makes_the_new_pr_a_major(): void
+    {
+        [, $plan] = $this->plan('v1.1.0', 'patch', self::URL, 'v1.0.0', 'regenerate/v1.0.5 feat!: regenerate from puntjes-openapi v1.0.5');
+
+        self::assertSame('regenerate/v1.0.5', $plan['close']);
+        self::assertSame('feat!', $plan['commit_type']);
+        self::assertSame('false', $plan['auto_merge']);
+    }
+
+    public function test_closing_an_open_minor_for_an_older_tag_keeps_the_new_level(): void
+    {
+        [, $plan] = $this->plan('v1.1.0', 'patch', self::URL, 'v1.0.0', 'regenerate/v1.0.5 feat: regenerate from puntjes-openapi v1.0.5');
+
+        self::assertSame('regenerate/v1.0.5', $plan['close']);
+        self::assertSame('fix', $plan['commit_type']);
+        self::assertSame('true', $plan['auto_merge']);
+    }
+
+    public function test_a_source_tag_with_a_lower_major_makes_the_new_pr_a_major(): void
+    {
+        $url = 'https://raw.githubusercontent.com/PuntjesApp/puntjes-openapi/v2.0.1/api.json';
+        [, $plan] = $this->plan('v2.0.1', 'patch', $url, 'v1.9.0');
+
+        self::assertSame('feat!', $plan['commit_type']);
+        self::assertSame('false', $plan['auto_merge']);
+    }
+
+    public function test_a_source_that_is_not_a_tag_keeps_the_new_level(): void
+    {
+        [, $plan] = $this->plan('v1.1.0', 'patch', self::URL, 'main@abc1234');
+
+        self::assertSame('fix', $plan['commit_type']);
+        self::assertSame('true', $plan['auto_merge']);
+    }
 }

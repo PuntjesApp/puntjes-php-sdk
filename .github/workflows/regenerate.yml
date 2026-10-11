@@ -39,8 +39,8 @@ jobs:
           LEVEL: ${{ github.event.client_payload.level }}
           URL: ${{ github.event.client_payload.url }}
         run: |
-          open=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 200 --json headRefName \
-            --jq '.[].headRefName | select(startswith("regenerate/"))')
+          open=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 200 --json headRefName,title \
+            --jq '.[] | select(.headRefName | startswith("regenerate/")) | "\(.headRefName) \(.title)"')
           php scripts/dispatch-plan.php "$TAG" "$LEVEL" "$URL" "$(cat spec/SOURCE)" "$open" >> "$GITHUB_OUTPUT"
       - name: Say why the dispatch is skipped
         if: steps.plan.outputs.skip == 'true'
@@ -81,17 +81,6 @@ jobs:
           git add spec src/Generated
           git commit -m "${TYPE}: regenerate from puntjes-openapi ${TAG}"
           git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$BRANCH"
-      - name: Close the open PRs for older tags
-        if: (steps.state.outputs.stage == 'fresh' || steps.state.outputs.stage == 'resume') && steps.plan.outputs.close != ''
-        env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
-          TAG: ${{ github.event.client_payload.tag }}
-          CLOSE: ${{ steps.plan.outputs.close }}
-        run: |
-          for branch in $CLOSE; do
-            gh pr close "$branch" --repo "$GITHUB_REPOSITORY" --delete-branch \
-              --comment "The spec ${TAG} replaces this one. Its regenerate PR holds every change of this PR."
-          done
       - name: Open the PR
         if: steps.state.outputs.stage == 'fresh' || steps.state.outputs.stage == 'resume'
         env:
@@ -110,14 +99,26 @@ jobs:
           if [ "$AUTO_MERGE" = true ]; then
             gh pr merge "$BRANCH" --repo "$GITHUB_REPOSITORY" --auto --squash
           fi
-      - name: Make sure the open PR merges itself
-        if: steps.state.outputs.stage == 'done' && steps.plan.outputs.auto_merge == 'true'
+      - name: Close the open PRs for older tags
+        if: steps.plan.outputs.skip == 'false' && steps.plan.outputs.close != ''
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          TAG: ${{ github.event.client_payload.tag }}
+          CLOSE: ${{ steps.plan.outputs.close }}
+        run: |
+          for branch in $CLOSE; do
+            gh pr close "$branch" --repo "$GITHUB_REPOSITORY" --delete-branch \
+              --comment "The spec ${TAG} replaces this one. Its regenerate PR holds every change of this PR."
+          done
+      - name: Make sure the open PR merges itself unless it is a major
+        if: steps.state.outputs.stage == 'done'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           PR: ${{ steps.state.outputs.pr }}
         run: |
-          state=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json state,autoMergeRequest \
-            --jq 'if .state != "OPEN" then "closed" elif .autoMergeRequest == null then "manual" else "auto" end')
+          state=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json state,title,autoMergeRequest \
+            --jq 'if .state != "OPEN" then "closed" elif (.title | startswith("feat!:")) then "major"
+              elif .autoMergeRequest == null then "manual" else "auto" end')
           if [ "$state" = manual ]; then
             gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --auto --squash
           fi
