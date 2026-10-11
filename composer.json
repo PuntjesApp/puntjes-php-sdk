@@ -2,7 +2,13 @@
     "name": "puntjes/php-sdk",
     "description": "Framework-agnostic PHP client for the Puntjes loyalty API.",
     "type": "library",
-    "keywords": ["puntjes", "loyalty", "sdk", "api", "psr-18"],
+    "keywords": [
+        "puntjes",
+        "loyalty",
+        "sdk",
+        "api",
+        "psr-18"
+    ],
     "homepage": "https://github.com/PuntjesApp/puntjes-php-sdk",
     "license": "MIT",
     "support": {
