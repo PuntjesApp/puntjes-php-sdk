@@ -325,6 +325,9 @@ composer test:contract
 With the variables unset, or a base URL that is not local, the suite fails. A refusal is a
 failure, never a skip, because a skipped suite is green with no call made.
 
+The suite also checks every answer against `spec/api.json`. A field the spec marks as
+always present fails the suite when the answer leaves it out, also when no test reads it.
+
 ### Checks on a pull request
 
 Every pull request and every push to `main` runs PHPUnit (Unit suite), PHPStan and Pint in
