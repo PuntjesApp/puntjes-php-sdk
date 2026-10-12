@@ -18,7 +18,9 @@ use Puntjes\Generated\Products\Batch\BatchPostRequestBody;
 use Puntjes\Generated\Products\ProductsRequestBuilderGetRequestConfiguration;
 use Puntjes\Generated\PuntjesClient;
 use Puntjes\Puntjes;
+use Puntjes\Tests\Contract\Support\CheckedHttpClient;
 use Puntjes\Tests\Contract\Support\Live;
+use Puntjes\Tests\Contract\Support\RequiredFields;
 use Puntjes\WalletPass;
 
 /**
@@ -33,6 +35,8 @@ final class LiveApiTest extends TestCase
 
     private static ?TokenStore $sharedStore = null;
 
+    private static ?CheckedHttpClient $http = null;
+
     private static function client(?TokenStore $tokenStore = null, ?string $secret = null): PuntjesClient
     {
         $tokenStore ??= $secret === null ? (self::$sharedStore ??= new InMemoryTokenStore) : null;
@@ -42,6 +46,7 @@ final class LiveApiTest extends TestCase
             $secret ?? (string) getenv('PUNTJES_CLIENT_SECRET'),
             (string) preg_replace('#/api/v1$#', '', Live::baseUrl()),
             $tokenStore,
+            httpClient: self::$http ??= new CheckedHttpClient(RequiredFields::fromSpecFile(), (string) parse_url(Live::baseUrl(), PHP_URL_PATH)),
             maxRetries: 0,
         );
     }
@@ -462,6 +467,11 @@ final class LiveApiTest extends TestCase
         $config = new ProductsRequestBuilderGetRequestConfiguration(queryParameters: ProductsRequestBuilderGetRequestConfiguration::createQueryParameters(category: Live::runId()));
         self::assertCount(0, $products->get($config)->wait()->getData()->getData());
         Live::hit(self::CLIENT, 'deleteProduct');
+    }
+
+    public function test_every_answer_carries_its_required_fields(): void
+    {
+        self::assertSame([], CheckedHttpClient::gaps());
     }
 
     public function test_every_operation_was_called(): void
