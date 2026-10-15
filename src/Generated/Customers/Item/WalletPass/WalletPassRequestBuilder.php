@@ -43,6 +43,7 @@ class WalletPassRequestBuilder extends BaseRequestBuilder
                 '422' => [ErrorResponse::class, 'createFromDiscriminatorValue'],
                 '429' => [ErrorResponse::class, 'createFromDiscriminatorValue'],
                 '500' => [ErrorResponse::class, 'createFromDiscriminatorValue'],
+                '503' => [ErrorResponse::class, 'createFromDiscriminatorValue'],
         ];
         return $this->requestAdapter->sendAsync($requestInfo, [WalletPassGetResponse::class, 'createFromDiscriminatorValue'], $errorMappings);
     }

@@ -9,6 +9,7 @@ namespace Puntjes\Generated\Errors;
  */
 enum ErrorCode: string
 {
+    case AppleWalletUnavailable = 'APPLE_WALLET_UNAVAILABLE';
     case BatchTooLarge = 'BATCH_TOO_LARGE';
     case BranchInactive = 'BRANCH_INACTIVE';
     case BranchNotFound = 'BRANCH_NOT_FOUND';
@@ -64,6 +65,7 @@ enum ErrorCode: string
     public function status(): int
     {
         return match ($this) {
+            self::AppleWalletUnavailable => 503,
             self::BatchTooLarge => 422,
             self::BranchInactive => 422,
             self::BranchNotFound => 422,
