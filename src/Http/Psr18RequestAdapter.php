@@ -154,7 +154,7 @@ final class Psr18RequestAdapter implements RequestAdapter
         }
         $type = strtolower(trim(explode(';', $response->header('content-type') ?? self::JSON)[0]));
         if ($type !== self::JSON) {
-            throw $this->unreadable($response);
+            throw $this->notJson($response);
         }
         try {
             return $this->getParseNodeFactory()->getRootParseNode($type, Utils::streamFor($response->body));
@@ -179,12 +179,22 @@ final class Psr18RequestAdapter implements RequestAdapter
         }
     }
 
-    private function unreadable(Response $response, ?Throwable $previous = null): TransportException
+    private function notJson(Response $response): TransportException
     {
         return new TransportException(sprintf(
             'Expected a JSON response from the Puntjes API but got %s (HTTP %d): %s',
             $response->header('content-type') ?? 'no content type',
             $response->status,
+            $response->bodyExcerpt(),
+        ));
+    }
+
+    private function unreadable(Response $response, Throwable $previous): TransportException
+    {
+        return new TransportException(sprintf(
+            'Could not read the JSON response of the Puntjes API (HTTP %d): %s Body: %s',
+            $response->status,
+            $previous->getMessage(),
             $response->bodyExcerpt(),
         ), 0, $previous);
     }
