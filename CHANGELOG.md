@@ -8,6 +8,16 @@ a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 From 2.0.0, [release-please](https://github.com/googleapis/release-please) writes new entries from the
 conventional commits. Moving from 1.x to 2.0: see [UPGRADING.md](UPGRADING.md).
 
+## [3.2.1](https://github.com/PuntjesApp/puntjes-php-sdk/compare/v3.2.0...v3.2.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* **errors:** say a JSON answer could not be read, and why ([5e3ad74](https://github.com/PuntjesApp/puntjes-php-sdk/commit/5e3ad74b11889c4e22c42540c72a0729fb5cb0a7))
+* **parsing:** read a type_specific_data without its type by its shape ([5f66fea](https://github.com/PuntjesApp/puntjes-php-sdk/commit/5f66fea0ca03df513733a3a75b8d65be5cb7c7a3))
+* **parsing:** read an enum value the SDK does not know as null ([8a5aa3f](https://github.com/PuntjesApp/puntjes-php-sdk/commit/8a5aa3feba310190a578e22c157da28d1cc59f21))
+* refuse to build Puntjes\Puntjes in a container ([54bf149](https://github.com/PuntjesApp/puntjes-php-sdk/commit/54bf149e8c5036fb29a8066a90c0187352c83084))
+
 ## [3.2.0](https://github.com/PuntjesApp/puntjes-php-sdk/compare/v3.1.0...v3.2.0) (2026-10-16)
 
 
