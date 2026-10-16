@@ -19,7 +19,8 @@ use Psr\Http\Message\StreamInterface;
 
 /**
  * Kiota's JSON parse node, made tolerant of answers from a newer API: an enum value the generated code does not know
- * reads as null, and its raw string stays in the model's additional data. Primitive reads are Kiota's own.
+ * reads as null (its raw string stays in the model's additional data), and a redemption's type_specific_data without
+ * its "type" key is read by its shape ({@see DiscriminatorFallback}). Primitive reads are Kiota's own.
  */
 final class LenientJsonParseNode implements ParseNode
 {
@@ -51,7 +52,7 @@ final class LenientJsonParseNode implements ParseNode
             throw new InvalidArgumentException("Invalid type $type[0] provided.");
         }
 
-        $result = $type($this);
+        $result = $type($this->discriminated($type[0]));
         if ($this->onBefore !== null) {
             ($this->onBefore)($result);
         }
@@ -161,6 +162,16 @@ final class LenientJsonParseNode implements ParseNode
     public function setOnBeforeAssignFieldValues(callable $value): void
     {
         $this->onBefore = $value;
+    }
+
+    /**
+     * The node the model's factory reads its discriminator from: this one, or a copy carrying the inferred "type".
+     */
+    private function discriminated(string $class): self
+    {
+        $type = is_array($this->content) ? DiscriminatorFallback::typeFor($class, $this->content) : null;
+
+        return $type === null ? $this : new self(['type' => $type] + $this->content);
     }
 
     private function assignFieldValues(Parsable $result): void
