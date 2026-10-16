@@ -20,6 +20,8 @@ use Puntjes\Http\Transport;
  */
 final class Puntjes
 {
+    private function __construct() {}
+
     /**
      * @param  array<string, string>  $defaultHeaders
      * @param  (callable(float): void)|null  $sleeper
