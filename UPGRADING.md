@@ -56,6 +56,9 @@ forms of the base URL still work (`https://puntjes.app` and `https://puntjes.app
 
 `Puntjes::fromConfig()` is gone. Call `make()`.
 
+In a container, resolve `PuntjesClient`, not `Puntjes`. `Puntjes\Puntjes` only builds clients, so a
+container asked for it fails at once.
+
 ## Every 1.x call, in 2.0
 
 `$c` is the client from `Puntjes::make()`. Each 2.0 call ends with `->wait()`, and the
