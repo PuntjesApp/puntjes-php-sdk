@@ -2,7 +2,7 @@
 
 PHP client for the [Puntjes](https://puntjes.app) loyalty API.
 
-It works anywhere PHP 8.1 runs: a Laravel webshop, a WooCommerce plugin, a POS bridge,
+It works anywhere PHP 8.2 runs: a Laravel webshop, a WooCommerce plugin, a POS bridge,
 a cron script. It does not force an HTTP client on you.
 
 The client is generated from the Puntjes OpenAPI spec, so it has every call the API has.
@@ -234,15 +234,13 @@ plugins bundle different versions of one library, one of them breaks. Run
 distribute it. Scope every package this SDK installs. On PHP 8.4 with the newest versions
 that is:
 
-- `guzzlehttp/psr7`, `ralouphie/getallheaders`, `php-http/discovery`, `php-http/promise`
-  and the `psr/*` interfaces (`psr/http-client`, `psr/http-factory`, `psr/http-message`,
-  `psr/cache`, `psr/log`)
+- `guzzlehttp/psr7`, `php-http/discovery`, `php-http/promise` and the `psr/*` interfaces
+  (`psr/http-client`, `psr/http-factory`, `psr/http-message`, `psr/log`)
 - the Kiota packages (`microsoft/kiota-abstractions`, `microsoft/kiota-serialization-json`,
   `microsoft/kiota-serialization-text`) and `stduritemplate/stduritemplate`
 - what Kiota needs: `open-telemetry/api`, `open-telemetry/context`, `open-telemetry/sdk`,
   `open-telemetry/sem-conv`, `tbachert/spi`, `nyholm/psr7-server`, `composer/semver`,
-  `doctrine/annotations`, `doctrine/lexer`, `ramsey/uuid`, `ramsey/collection` and
-  `brick/math`
+  `ramsey/uuid`, `ramsey/collection` and `brick/math`
 - the Symfony polyfills (`symfony/deprecation-contracts`, `symfony/polyfill-*`)
 
 Run `composer show --no-dev` in your plugin to see the exact list for your PHP version.
@@ -335,8 +333,8 @@ three runs:
 
 | Run | What it installs | What it proves |
 |---|---|---|
-| `PHP 8.1 · oldest allowed packages` | The oldest version of every package that `composer.json` allows | The lower bounds in `composer.json` are true |
-| `PHP 8.1 · newest packages` | The newest versions that install on PHP 8.1 | The package works on its lowest PHP version today |
+| `PHP 8.2 · oldest allowed packages` | The oldest version of every package that `composer.json` allows | The lower bounds in `composer.json` are true |
+| `PHP 8.2 · newest packages` | The newest versions that install on PHP 8.2 | The package works on its lowest PHP version today |
 | `PHP 8.4 · newest packages` | The newest versions of everything | The package works on a current PHP |
 
 The check named `CI` is green only when all three runs are green.
