@@ -8,6 +8,13 @@ a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 From 2.0.0, [release-please](https://github.com/googleapis/release-please) writes new entries from the
 conventional commits. Moving from 1.x to 2.0: see [UPGRADING.md](UPGRADING.md).
 
+## [3.2.0](https://github.com/PuntjesApp/puntjes-php-sdk/compare/v3.1.0...v3.2.0) (2026-10-16)
+
+
+### Features
+
+* **deps:** allow guzzlehttp/psr7 3, so the SDK installs next to Guzzle 8 ([#53](https://github.com/PuntjesApp/puntjes-php-sdk/issues/53)) ([46acb9c](https://github.com/PuntjesApp/puntjes-php-sdk/commit/46acb9c2405afe3277390a3eeb796b832cf21483))
+
 ## [3.1.0](https://github.com/PuntjesApp/puntjes-php-sdk/compare/v3.0.0...v3.1.0) (2026-10-15)
 
 
