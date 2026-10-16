@@ -16,6 +16,7 @@ use Microsoft\Kiota\Abstractions\Types\Date;
 use Microsoft\Kiota\Abstractions\Types\Time;
 use Microsoft\Kiota\Serialization\Json\JsonParseNode;
 use Psr\Http\Message\StreamInterface;
+use ReflectionMethod;
 
 /**
  * Kiota's JSON parse node, made tolerant of answers from a newer API: an enum value the generated code does not know
@@ -209,7 +210,9 @@ final class LenientJsonParseNode implements ParseNode
             return null;
         }
         foreach (get_class_methods($result) as $method) {
-            $member = str_starts_with($method, 'get') && $method !== 'getFieldDeserializers' ? $result->{$method}() : null;
+            $getter = str_starts_with($method, 'get') && $method !== 'getFieldDeserializers'
+                && (new ReflectionMethod($result, $method))->getNumberOfRequiredParameters() === 0;
+            $member = $getter ? $result->{$method}() : null;
             if ($member instanceof AdditionalDataHolder) {
                 return $member;
             }
