@@ -22,6 +22,7 @@ use Psr\Http\Message\StreamInterface;
 use Puntjes\Exception\ConfigurationException;
 use Puntjes\Exception\TransportException;
 use Puntjes\Generated\Security\PublicOperations;
+use Puntjes\Http\Json\LenientJsonParseNodeFactory;
 use Throwable;
 
 /**
@@ -32,6 +33,8 @@ use Throwable;
 final class Psr18RequestAdapter implements RequestAdapter
 {
     private const JSON = 'application/json';
+
+    private ?ParseNodeFactoryRegistry $parseNodes = null;
 
     public function __construct(private readonly Transport $transport, private string $baseUrl) {}
 
@@ -81,9 +84,17 @@ final class Psr18RequestAdapter implements RequestAdapter
         return SerializationWriterFactoryRegistry::getDefaultInstance();
     }
 
+    /**
+     * Its own registry rather than Kiota's shared default, so JSON is read by {@see LenientJsonParseNodeFactory}.
+     */
     public function getParseNodeFactory(): ParseNodeFactory
     {
-        return ParseNodeFactoryRegistry::getDefaultInstance();
+        if ($this->parseNodes === null) {
+            $this->parseNodes = new ParseNodeFactoryRegistry;
+            $this->parseNodes->contentTypeAssociatedFactories = [self::JSON => new LenientJsonParseNodeFactory];
+        }
+
+        return $this->parseNodes;
     }
 
     public function enableBackingStore(BackingStoreFactory $backingStoreFactory): void {}
