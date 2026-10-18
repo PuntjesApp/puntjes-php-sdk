@@ -24,7 +24,7 @@ use Puntjes\Tests\Contract\Support\RequiredFields;
 use Puntjes\WalletPass;
 
 /**
- * Calls all 34 operations through the generated 2.0 client, built the way a consumer builds it.
+ * Calls all 35 operations through the generated 2.0 client, built the way a consumer builds it.
  */
 final class LiveApiTest extends TestCase
 {
@@ -251,6 +251,15 @@ final class LiveApiTest extends TestCase
 
         self::assertContains(self::$state['reward'], $ids);
         Live::hit(self::CLIENT, 'listRewards');
+    }
+
+    public function test_list_branches(): void
+    {
+        $branches = self::client()->branches()->get()->wait()->getData();
+
+        self::assertIsArray($branches);
+        self::assertContainsOnlyInstancesOf(Models\BranchReferenceData::class, $branches);
+        Live::hit(self::CLIENT, 'listBranches');
     }
 
     public function test_register_customer(): void
