@@ -31,12 +31,12 @@ class VerifyRequestBuilder extends BaseRequestBuilder
     }
 
     /**
-     * @param VerifyRedemptionData $body The request body
+     * @param VerifyRedemptionData|null $body The request body
      * @param VerifyRequestBuilderPostRequestConfiguration|null $requestConfiguration Configuration for the request such as headers, query parameters, and middleware options.
      * @return Promise<VerifyPostResponse|null>
      * @throws Exception
     */
-    public function post(VerifyRedemptionData $body, ?VerifyRequestBuilderPostRequestConfiguration $requestConfiguration = null): Promise {
+    public function post(?VerifyRedemptionData $body = null, ?VerifyRequestBuilderPostRequestConfiguration $requestConfiguration = null): Promise {
         $requestInfo = $this->toPostRequestInformation($body, $requestConfiguration);
         $errorMappings = [
                 '400' => [ErrorResponse::class, 'createFromDiscriminatorValue'],
@@ -52,11 +52,11 @@ class VerifyRequestBuilder extends BaseRequestBuilder
     }
 
     /**
-     * @param VerifyRedemptionData $body The request body
+     * @param VerifyRedemptionData|null $body The request body
      * @param VerifyRequestBuilderPostRequestConfiguration|null $requestConfiguration Configuration for the request such as headers, query parameters, and middleware options.
      * @return RequestInformation
     */
-    public function toPostRequestInformation(VerifyRedemptionData $body, ?VerifyRequestBuilderPostRequestConfiguration $requestConfiguration = null): RequestInformation {
+    public function toPostRequestInformation(?VerifyRedemptionData $body = null, ?VerifyRequestBuilderPostRequestConfiguration $requestConfiguration = null): RequestInformation {
         $requestInfo = new RequestInformation();
         $requestInfo->urlTemplate = $this->urlTemplate;
         $requestInfo->pathParameters = $this->pathParameters;
@@ -66,7 +66,9 @@ class VerifyRequestBuilder extends BaseRequestBuilder
             $requestInfo->addRequestOptions(...$requestConfiguration->options);
         }
         $requestInfo->tryAddHeader('Accept', "application/json");
-        $requestInfo->setContentFromParsable($this->requestAdapter, "application/json", $body);
+        if ($body !== null) {
+            $requestInfo->setContentFromParsable($this->requestAdapter, "application/json", $body);
+        }
         return $requestInfo;
     }
 

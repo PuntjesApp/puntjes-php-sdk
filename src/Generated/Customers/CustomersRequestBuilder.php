@@ -67,12 +67,12 @@ class CustomersRequestBuilder extends BaseRequestBuilder
     }
 
     /**
-     * @param CreateCustomerData $body The request body
+     * @param CreateCustomerData|null $body The request body
      * @param CustomersRequestBuilderPostRequestConfiguration|null $requestConfiguration Configuration for the request such as headers, query parameters, and middleware options.
      * @return Promise<CustomersPostResponse|null>
      * @throws Exception
     */
-    public function post(CreateCustomerData $body, ?CustomersRequestBuilderPostRequestConfiguration $requestConfiguration = null): Promise {
+    public function post(?CreateCustomerData $body = null, ?CustomersRequestBuilderPostRequestConfiguration $requestConfiguration = null): Promise {
         $requestInfo = $this->toPostRequestInformation($body, $requestConfiguration);
         $errorMappings = [
                 '400' => [ErrorResponse::class, 'createFromDiscriminatorValue'],
@@ -88,11 +88,11 @@ class CustomersRequestBuilder extends BaseRequestBuilder
     }
 
     /**
-     * @param CreateCustomerData $body The request body
+     * @param CreateCustomerData|null $body The request body
      * @param CustomersRequestBuilderPostRequestConfiguration|null $requestConfiguration Configuration for the request such as headers, query parameters, and middleware options.
      * @return RequestInformation
     */
-    public function toPostRequestInformation(CreateCustomerData $body, ?CustomersRequestBuilderPostRequestConfiguration $requestConfiguration = null): RequestInformation {
+    public function toPostRequestInformation(?CreateCustomerData $body = null, ?CustomersRequestBuilderPostRequestConfiguration $requestConfiguration = null): RequestInformation {
         $requestInfo = new RequestInformation();
         $requestInfo->urlTemplate = $this->urlTemplate;
         $requestInfo->pathParameters = $this->pathParameters;
@@ -102,7 +102,9 @@ class CustomersRequestBuilder extends BaseRequestBuilder
             $requestInfo->addRequestOptions(...$requestConfiguration->options);
         }
         $requestInfo->tryAddHeader('Accept', "application/json");
-        $requestInfo->setContentFromParsable($this->requestAdapter, "application/json", $body);
+        if ($body !== null) {
+            $requestInfo->setContentFromParsable($this->requestAdapter, "application/json", $body);
+        }
         return $requestInfo;
     }
 
