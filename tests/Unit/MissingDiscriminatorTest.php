@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Puntjes\Generated\Models\CreateRedemptionData;
 use Puntjes\Generated\Models\DiscountRedemptionData;
 use Puntjes\Generated\Models\FreeProductRedemptionData;
+use Puntjes\Generated\Models\VerifyRedemptionData;
 use Puntjes\Tests\Support\RedemptionAnswer;
 use Puntjes\Tests\Support\TestCase;
 
@@ -100,7 +101,7 @@ final class MissingDiscriminatorTest extends TestCase
         $data = match ($answer) {
             'created' => $code->post(new CreateRedemptionData)->wait()->getData(),
             'lookup' => $code->byCode('ABC123')->get()->wait()->getData(),
-            'verification' => $code->byCode('ABC123')->verify()->post()->wait()->getData(),
+            'verification' => $code->byCode('ABC123')->verify()->post(new VerifyRedemptionData)->wait()->getData(),
         };
 
         return $data->getTypeSpecificData();

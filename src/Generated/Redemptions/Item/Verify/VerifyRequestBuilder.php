@@ -9,6 +9,7 @@ use Microsoft\Kiota\Abstractions\HttpMethod;
 use Microsoft\Kiota\Abstractions\RequestAdapter;
 use Microsoft\Kiota\Abstractions\RequestInformation;
 use Puntjes\Generated\Models\ErrorResponse;
+use Puntjes\Generated\Models\VerifyRedemptionData;
 
 /**
  * Builds and executes requests for operations under /redemptions/{code}/verify
@@ -30,13 +31,15 @@ class VerifyRequestBuilder extends BaseRequestBuilder
     }
 
     /**
+     * @param VerifyRedemptionData $body The request body
      * @param VerifyRequestBuilderPostRequestConfiguration|null $requestConfiguration Configuration for the request such as headers, query parameters, and middleware options.
      * @return Promise<VerifyPostResponse|null>
      * @throws Exception
     */
-    public function post(?VerifyRequestBuilderPostRequestConfiguration $requestConfiguration = null): Promise {
-        $requestInfo = $this->toPostRequestInformation($requestConfiguration);
+    public function post(VerifyRedemptionData $body, ?VerifyRequestBuilderPostRequestConfiguration $requestConfiguration = null): Promise {
+        $requestInfo = $this->toPostRequestInformation($body, $requestConfiguration);
         $errorMappings = [
+                '400' => [ErrorResponse::class, 'createFromDiscriminatorValue'],
                 '401' => [ErrorResponse::class, 'createFromDiscriminatorValue'],
                 '403' => [ErrorResponse::class, 'createFromDiscriminatorValue'],
                 '404' => [ErrorResponse::class, 'createFromDiscriminatorValue'],
@@ -49,10 +52,11 @@ class VerifyRequestBuilder extends BaseRequestBuilder
     }
 
     /**
+     * @param VerifyRedemptionData $body The request body
      * @param VerifyRequestBuilderPostRequestConfiguration|null $requestConfiguration Configuration for the request such as headers, query parameters, and middleware options.
      * @return RequestInformation
     */
-    public function toPostRequestInformation(?VerifyRequestBuilderPostRequestConfiguration $requestConfiguration = null): RequestInformation {
+    public function toPostRequestInformation(VerifyRedemptionData $body, ?VerifyRequestBuilderPostRequestConfiguration $requestConfiguration = null): RequestInformation {
         $requestInfo = new RequestInformation();
         $requestInfo->urlTemplate = $this->urlTemplate;
         $requestInfo->pathParameters = $this->pathParameters;
@@ -62,6 +66,7 @@ class VerifyRequestBuilder extends BaseRequestBuilder
             $requestInfo->addRequestOptions(...$requestConfiguration->options);
         }
         $requestInfo->tryAddHeader('Accept', "application/json");
+        $requestInfo->setContentFromParsable($this->requestAdapter, "application/json", $body);
         return $requestInfo;
     }
 

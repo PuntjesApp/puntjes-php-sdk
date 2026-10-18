@@ -15,7 +15,9 @@ use Puntjes\Generated\Models\CreateIdentifierData;
 use Puntjes\Generated\Models\CreateIdentifierData_type;
 use Puntjes\Generated\Models\CreateRewardFromProductData;
 use Puntjes\Generated\Models\CreateTransactionData;
+use Puntjes\Generated\Models\VerifyRedemptionData;
 use Puntjes\IdempotencyKey;
+use Puntjes\Tests\Support\RedemptionAnswer;
 use Puntjes\Tests\Support\TestCase;
 
 /**
@@ -179,7 +181,22 @@ final class RetryTest extends TestCase
         }
     }
 
-    public function test_verifying_a_redemption_is_never_retried(): void
+    public function test_verifying_a_redemption_with_a_key_is_retried_with_the_same_key(): void
+    {
+        $this->fake->queueError(500, 'INTERNAL_ERROR');
+        $this->fake->queueData(RedemptionAnswer::lookup([]));
+
+        $body = new VerifyRedemptionData;
+        $body->setIdempotencyKey('verify-abc-123');
+
+        $this->puntjes()->redemptions()->byCode('ABC-123')->verify()->post($body)->wait();
+
+        self::assertSame([0.5], $this->sleeps);
+        self::assertSame('verify-abc-123', $this->fake->bodyAt(1)['idempotency_key']);
+        self::assertSame('verify-abc-123', $this->fake->bodyAt(2)['idempotency_key']);
+    }
+
+    public function test_verifying_a_redemption_without_a_key_is_never_retried(): void
     {
         $this->fake->queueError(500, 'INTERNAL_ERROR');
 
@@ -189,7 +206,7 @@ final class RetryTest extends TestCase
 
         try {
             // A replay would burn the code and answer CODE_ALREADY_USED.
-            $puntjes->redemptions()->byCode('ABC-123')->verify()->post()->wait();
+            $puntjes->redemptions()->byCode('ABC-123')->verify()->post(new VerifyRedemptionData)->wait();
         } finally {
             self::assertSame(2, $this->fake->requestCount());
         }
