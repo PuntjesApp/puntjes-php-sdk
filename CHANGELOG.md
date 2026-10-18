@@ -15,6 +15,24 @@ conventional commits. Moving from 1.x to 2.0: see [UPGRADING.md](UPGRADING.md).
 
 * regenerate from puntjes-openapi v2.2.0 ([#60](https://github.com/PuntjesApp/puntjes-php-sdk/issues/60)) ([2705459](https://github.com/PuntjesApp/puntjes-php-sdk/commit/2705459773a73f01f3f5a461f181eb3d8793f29b))
 
+### ⚠ Breaking
+
+Spec v2.2.0 made the body of `POST /redemptions/{code}/verify` optional. The generator makes it a required argument. This changes one public call:
+
+```php
+// before (3.2.2)
+$client->redemptions()->byCode($code)->verify()->post();
+$client->redemptions()->byCode($code)->verify()->post($requestConfiguration);
+
+// after (3.3.0)
+$client->redemptions()->byCode($code)->verify()->post(new VerifyRedemptionData());
+$client->redemptions()->byCode($code)->verify()->post(new VerifyRedemptionData(), $requestConfiguration);
+```
+
+`VerifyRequestBuilder::toPostRequestInformation()` changed the same way: the body is the new first argument. `VerifyRedemptionData` has the optional `setBranch()` and `setIdempotencyKey()`.
+
+This is the only public break between v3.2.2 and v3.3.0, as reported by `roave/backward-compatibility-check`.
+
 ## [3.2.2](https://github.com/PuntjesApp/puntjes-php-sdk/compare/v3.2.1...v3.2.2) (2026-10-18)
 
 

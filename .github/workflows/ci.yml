@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
   workflow_call:
@@ -81,10 +82,42 @@ jobs:
           git status --porcelain -- src/Generated
           test -z "$(git status --porcelain -- src/Generated)"
 
+  # Compares the public API with the latest release. A breaking change needs a `feat!:` title; see scripts/bc-check.sh.
+  # The tool is pinned and installed outside composer.json, because its own dependencies need PHP 8.4.
+  bc:
+    name: Public API stays compatible
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.4'
+          extensions: intl
+          coverage: none
+
+      - name: Install dependencies and the BC check
+        run: |
+          composer update --no-interaction --no-progress --prefer-dist
+          composer global require --no-interaction --no-progress roave/backward-compatibility-check:8.23.0
+          echo "$(composer global config bin-dir --absolute --quiet)" >> "$GITHUB_PATH"
+
+      - name: Compare with the latest release
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: sh scripts/bc-check.sh
+
   # The one check branch protection requires, so a change to the matrix never edits the protection.
   ci:
     name: CI
-    needs: [test, generated]
+    needs: [test, generated, bc]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -93,4 +126,5 @@ jobs:
         env:
           RESULT: ${{ needs.test.result }}
           GENERATED: ${{ needs.generated.result }}
-        run: test "$RESULT" = success && test "$GENERATED" = success
+          BC: ${{ needs.bc.result }}
+        run: test "$RESULT" = success && test "$GENERATED" = success && { test "$BC" = success || test "$BC" = skipped; }
