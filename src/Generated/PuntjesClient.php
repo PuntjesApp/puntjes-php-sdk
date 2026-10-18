@@ -9,6 +9,7 @@ use Microsoft\Kiota\Serialization\Json\JsonParseNodeFactory;
 use Microsoft\Kiota\Serialization\Json\JsonSerializationWriterFactory;
 use Microsoft\Kiota\Serialization\Text\TextParseNodeFactory;
 use Microsoft\Kiota\Serialization\Text\TextSerializationWriterFactory;
+use Puntjes\Generated\Branches\BranchesRequestBuilder;
 use Puntjes\Generated\Campaigns\CampaignsRequestBuilder;
 use Puntjes\Generated\Customers\CustomersRequestBuilder;
 use Puntjes\Generated\Health\HealthRequestBuilder;
@@ -25,6 +26,13 @@ use Puntjes\Generated\Vouchers\VouchersRequestBuilder;
 */
 class PuntjesClient extends BaseRequestBuilder 
 {
+    /**
+     * The branches property
+    */
+    public function branches(): BranchesRequestBuilder {
+        return new BranchesRequestBuilder($this->pathParameters, $this->requestAdapter);
+    }
+    
     /**
      * The campaigns property
     */

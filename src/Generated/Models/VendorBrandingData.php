@@ -25,6 +25,11 @@ class VendorBrandingData implements AdditionalDataHolder, Parsable
     private ?string $brand_color_primary = null;
     
     /**
+     * @var BranchReferenceData|null $default_branch The default_branch property
+    */
+    private ?BranchReferenceData $default_branch = null;
+    
+    /**
      * @var string|null $display_name The display_name property
     */
     private ?string $display_name = null;
@@ -75,6 +80,14 @@ class VendorBrandingData implements AdditionalDataHolder, Parsable
     }
 
     /**
+     * Gets the default_branch property value. The default_branch property
+     * @return BranchReferenceData|null
+    */
+    public function getDefaultBranch(): ?BranchReferenceData {
+        return $this->default_branch;
+    }
+
+    /**
      * Gets the display_name property value. The display_name property
      * @return string|null
     */
@@ -91,6 +104,7 @@ class VendorBrandingData implements AdditionalDataHolder, Parsable
         return  [
             'brand_color_accent' => fn(ParseNode $n) => $o->setBrandColorAccent($n->getStringValue()),
             'brand_color_primary' => fn(ParseNode $n) => $o->setBrandColorPrimary($n->getStringValue()),
+            'default_branch' => fn(ParseNode $n) => $o->setDefaultBranch($n->getObjectValue([BranchReferenceData::class, 'createFromDiscriminatorValue'])),
             'display_name' => fn(ParseNode $n) => $o->setDisplayName($n->getStringValue()),
             'logo_url' => fn(ParseNode $n) => $o->setLogoUrl($n->getStringValue()),
         ];
@@ -111,6 +125,7 @@ class VendorBrandingData implements AdditionalDataHolder, Parsable
     public function serialize(SerializationWriter $writer): void {
         $writer->writeStringValue('brand_color_accent', $this->getBrandColorAccent());
         $writer->writeStringValue('brand_color_primary', $this->getBrandColorPrimary());
+        $writer->writeObjectValue('default_branch', $this->getDefaultBranch());
         $writer->writeStringValue('display_name', $this->getDisplayName());
         $writer->writeStringValue('logo_url', $this->getLogoUrl());
         $writer->writeAdditionalData($this->getAdditionalData());
@@ -138,6 +153,14 @@ class VendorBrandingData implements AdditionalDataHolder, Parsable
     */
     public function setBrandColorPrimary(?string $value): void {
         $this->brand_color_primary = $value;
+    }
+
+    /**
+     * Sets the default_branch property value. The default_branch property
+     * @param BranchReferenceData|null $value Value to set for the default_branch property.
+    */
+    public function setDefaultBranch(?BranchReferenceData $value): void {
+        $this->default_branch = $value;
     }
 
     /**

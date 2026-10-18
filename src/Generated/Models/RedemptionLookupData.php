@@ -15,6 +15,11 @@ class RedemptionLookupData implements AdditionalDataHolder, Parsable
     private ?array $additionalData = null;
     
     /**
+     * @var array<BranchReferenceData>|null $branches The branches the reward has now; null means every branch.
+    */
+    private ?array $branches = null;
+    
+    /**
      * @var string|null $confirmation_code The confirmation_code property
     */
     private ?string $confirmation_code = null;
@@ -89,6 +94,14 @@ class RedemptionLookupData implements AdditionalDataHolder, Parsable
     }
 
     /**
+     * Gets the branches property value. The branches the reward has now; null means every branch.
+     * @return array<BranchReferenceData>|null
+    */
+    public function getBranches(): ?array {
+        return $this->branches;
+    }
+
+    /**
      * Gets the confirmation_code property value. The confirmation_code property
      * @return string|null
     */
@@ -119,6 +132,7 @@ class RedemptionLookupData implements AdditionalDataHolder, Parsable
     public function getFieldDeserializers(): array {
         $o = $this;
         return  [
+            'branches' => fn(ParseNode $n) => $o->setBranches($n->getCollectionOfObjectValues([BranchReferenceData::class, 'createFromDiscriminatorValue'])),
             'confirmation_code' => fn(ParseNode $n) => $o->setConfirmationCode($n->getStringValue()),
             'customer' => fn(ParseNode $n) => $o->setCustomer($n->getObjectValue([RedemptionCustomerData::class, 'createFromDiscriminatorValue'])),
             'expires_at' => fn(ParseNode $n) => $o->setExpiresAt($n->getStringValue()),
@@ -193,6 +207,7 @@ class RedemptionLookupData implements AdditionalDataHolder, Parsable
      * @param SerializationWriter $writer Serialization writer to use to serialize this model
     */
     public function serialize(SerializationWriter $writer): void {
+        $writer->writeCollectionOfObjectValues('branches', $this->getBranches());
         $writer->writeStringValue('confirmation_code', $this->getConfirmationCode());
         $writer->writeObjectValue('customer', $this->getCustomer());
         $writer->writeStringValue('expires_at', $this->getExpiresAt());
@@ -212,6 +227,14 @@ class RedemptionLookupData implements AdditionalDataHolder, Parsable
     */
     public function setAdditionalData(?array $value): void {
         $this->additionalData = $value;
+    }
+
+    /**
+     * Sets the branches property value. The branches the reward has now; null means every branch.
+     * @param array<BranchReferenceData>|null $value Value to set for the branches property.
+    */
+    public function setBranches(?array $value): void {
+        $this->branches = $value;
     }
 
     /**

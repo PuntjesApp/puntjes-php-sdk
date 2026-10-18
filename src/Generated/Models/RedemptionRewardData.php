@@ -15,6 +15,11 @@ class RedemptionRewardData implements AdditionalDataHolder, Parsable
     private ?array $additionalData = null;
     
     /**
+     * @var int|null $id The reward's id, the one GET /rewards lists.
+    */
+    private ?int $id = null;
+    
+    /**
      * @var string|null $name The name property
     */
     private ?string $name = null;
@@ -55,9 +60,18 @@ class RedemptionRewardData implements AdditionalDataHolder, Parsable
     public function getFieldDeserializers(): array {
         $o = $this;
         return  [
+            'id' => fn(ParseNode $n) => $o->setId($n->getIntegerValue()),
             'name' => fn(ParseNode $n) => $o->setName($n->getStringValue()),
             'type' => fn(ParseNode $n) => $o->setType($n->getStringValue()),
         ];
+    }
+
+    /**
+     * Gets the id property value. The reward's id, the one GET /rewards lists.
+     * @return int|null
+    */
+    public function getId(): ?int {
+        return $this->id;
     }
 
     /**
@@ -81,6 +95,7 @@ class RedemptionRewardData implements AdditionalDataHolder, Parsable
      * @param SerializationWriter $writer Serialization writer to use to serialize this model
     */
     public function serialize(SerializationWriter $writer): void {
+        $writer->writeIntegerValue('id', $this->getId());
         $writer->writeStringValue('name', $this->getName());
         $writer->writeStringValue('type', $this->getType());
         $writer->writeAdditionalData($this->getAdditionalData());
@@ -92,6 +107,14 @@ class RedemptionRewardData implements AdditionalDataHolder, Parsable
     */
     public function setAdditionalData(?array $value): void {
         $this->additionalData = $value;
+    }
+
+    /**
+     * Sets the id property value. The reward's id, the one GET /rewards lists.
+     * @param int|null $value Value to set for the id property.
+    */
+    public function setId(?int $value): void {
+        $this->id = $value;
     }
 
     /**
