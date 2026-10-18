@@ -33,6 +33,8 @@ $client->redemptions()->byCode($code)->verify()->post(new VerifyRedemptionData()
 
 This is the only public break between v3.2.2 and v3.3.0, as reported by `roave/backward-compatibility-check`.
 
+The next patch release makes the body optional again: `post()` sends no body, as in 3.2.2, and `post($body)` sends it. A request configuration is still the second argument: `post(null, $requestConfiguration)`.
+
 ## [3.2.2](https://github.com/PuntjesApp/puntjes-php-sdk/compare/v3.2.1...v3.2.2) (2026-10-18)
 
 

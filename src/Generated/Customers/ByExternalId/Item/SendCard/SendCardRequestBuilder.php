@@ -31,12 +31,12 @@ class SendCardRequestBuilder extends BaseRequestBuilder
     }
 
     /**
-     * @param SendLoyaltyCardRequestData $body The request body
+     * @param SendLoyaltyCardRequestData|null $body The request body
      * @param SendCardRequestBuilderPostRequestConfiguration|null $requestConfiguration Configuration for the request such as headers, query parameters, and middleware options.
      * @return Promise<SendCardPostResponse|null>
      * @throws Exception
     */
-    public function post(SendLoyaltyCardRequestData $body, ?SendCardRequestBuilderPostRequestConfiguration $requestConfiguration = null): Promise {
+    public function post(?SendLoyaltyCardRequestData $body = null, ?SendCardRequestBuilderPostRequestConfiguration $requestConfiguration = null): Promise {
         $requestInfo = $this->toPostRequestInformation($body, $requestConfiguration);
         $errorMappings = [
                 '400' => [ErrorResponse::class, 'createFromDiscriminatorValue'],
@@ -52,11 +52,11 @@ class SendCardRequestBuilder extends BaseRequestBuilder
     }
 
     /**
-     * @param SendLoyaltyCardRequestData $body The request body
+     * @param SendLoyaltyCardRequestData|null $body The request body
      * @param SendCardRequestBuilderPostRequestConfiguration|null $requestConfiguration Configuration for the request such as headers, query parameters, and middleware options.
      * @return RequestInformation
     */
-    public function toPostRequestInformation(SendLoyaltyCardRequestData $body, ?SendCardRequestBuilderPostRequestConfiguration $requestConfiguration = null): RequestInformation {
+    public function toPostRequestInformation(?SendLoyaltyCardRequestData $body = null, ?SendCardRequestBuilderPostRequestConfiguration $requestConfiguration = null): RequestInformation {
         $requestInfo = new RequestInformation();
         $requestInfo->urlTemplate = $this->urlTemplate;
         $requestInfo->pathParameters = $this->pathParameters;
@@ -66,7 +66,9 @@ class SendCardRequestBuilder extends BaseRequestBuilder
             $requestInfo->addRequestOptions(...$requestConfiguration->options);
         }
         $requestInfo->tryAddHeader('Accept', "application/json");
-        $requestInfo->setContentFromParsable($this->requestAdapter, "application/json", $body);
+        if ($body !== null) {
+            $requestInfo->setContentFromParsable($this->requestAdapter, "application/json", $body);
+        }
         return $requestInfo;
     }
 

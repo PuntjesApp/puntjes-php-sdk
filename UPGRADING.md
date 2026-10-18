@@ -115,7 +115,7 @@ New in 2.0: `->byExternalId($ext)->put(UpdateCustomerData)` replaces a customer 
 | `redemptions->create(CreateRedemption)` | `$c->redemptions()->post(CreateRedemptionData)`. Set an idempotency key |
 | `redemptions->find($code)` | `$c->redemptions()->byCode($code)->get()` |
 | `redemptions->forCustomer($id, $status)` | `Paginator::of(...)` over `$c->customers()->byCustomer((string) $id)->redemptions()->get($config)`, query `status` |
-| `redemptions->verify($code)` | `$c->redemptions()->byCode($code)->verify()->post(VerifyRedemptionData)`, with `setBranch()` and `setIdempotencyKey()` |
+| `redemptions->verify($code)` | `$c->redemptions()->byCode($code)->verify()->post()`. To name the shop or set a key, pass a `VerifyRedemptionData` with `setBranch()` and `setIdempotencyKey()` |
 
 ### Transactions, wallets, vouchers
 

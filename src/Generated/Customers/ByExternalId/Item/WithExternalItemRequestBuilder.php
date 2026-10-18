@@ -39,12 +39,12 @@ class WithExternalItemRequestBuilder extends BaseRequestBuilder
     }
 
     /**
-     * @param UpdateCustomerData $body The request body
+     * @param UpdateCustomerData|null $body The request body
      * @param WithExternalItemRequestBuilderPatchRequestConfiguration|null $requestConfiguration Configuration for the request such as headers, query parameters, and middleware options.
      * @return Promise<WithExternalPatchResponse|null>
      * @throws Exception
     */
-    public function patch(UpdateCustomerData $body, ?WithExternalItemRequestBuilderPatchRequestConfiguration $requestConfiguration = null): Promise {
+    public function patch(?UpdateCustomerData $body = null, ?WithExternalItemRequestBuilderPatchRequestConfiguration $requestConfiguration = null): Promise {
         $requestInfo = $this->toPatchRequestInformation($body, $requestConfiguration);
         $errorMappings = [
                 '400' => [ErrorResponse::class, 'createFromDiscriminatorValue'],
@@ -61,12 +61,12 @@ class WithExternalItemRequestBuilder extends BaseRequestBuilder
     }
 
     /**
-     * @param UpdateCustomerData $body The request body
+     * @param UpdateCustomerData|null $body The request body
      * @param WithExternalItemRequestBuilderPutRequestConfiguration|null $requestConfiguration Configuration for the request such as headers, query parameters, and middleware options.
      * @return Promise<WithExternalPutResponse|null>
      * @throws Exception
     */
-    public function put(UpdateCustomerData $body, ?WithExternalItemRequestBuilderPutRequestConfiguration $requestConfiguration = null): Promise {
+    public function put(?UpdateCustomerData $body = null, ?WithExternalItemRequestBuilderPutRequestConfiguration $requestConfiguration = null): Promise {
         $requestInfo = $this->toPutRequestInformation($body, $requestConfiguration);
         $errorMappings = [
                 '400' => [ErrorResponse::class, 'createFromDiscriminatorValue'],
@@ -83,11 +83,11 @@ class WithExternalItemRequestBuilder extends BaseRequestBuilder
     }
 
     /**
-     * @param UpdateCustomerData $body The request body
+     * @param UpdateCustomerData|null $body The request body
      * @param WithExternalItemRequestBuilderPatchRequestConfiguration|null $requestConfiguration Configuration for the request such as headers, query parameters, and middleware options.
      * @return RequestInformation
     */
-    public function toPatchRequestInformation(UpdateCustomerData $body, ?WithExternalItemRequestBuilderPatchRequestConfiguration $requestConfiguration = null): RequestInformation {
+    public function toPatchRequestInformation(?UpdateCustomerData $body = null, ?WithExternalItemRequestBuilderPatchRequestConfiguration $requestConfiguration = null): RequestInformation {
         $requestInfo = new RequestInformation();
         $requestInfo->urlTemplate = $this->urlTemplate;
         $requestInfo->pathParameters = $this->pathParameters;
@@ -97,16 +97,18 @@ class WithExternalItemRequestBuilder extends BaseRequestBuilder
             $requestInfo->addRequestOptions(...$requestConfiguration->options);
         }
         $requestInfo->tryAddHeader('Accept', "application/json");
-        $requestInfo->setContentFromParsable($this->requestAdapter, "application/json", $body);
+        if ($body !== null) {
+            $requestInfo->setContentFromParsable($this->requestAdapter, "application/json", $body);
+        }
         return $requestInfo;
     }
 
     /**
-     * @param UpdateCustomerData $body The request body
+     * @param UpdateCustomerData|null $body The request body
      * @param WithExternalItemRequestBuilderPutRequestConfiguration|null $requestConfiguration Configuration for the request such as headers, query parameters, and middleware options.
      * @return RequestInformation
     */
-    public function toPutRequestInformation(UpdateCustomerData $body, ?WithExternalItemRequestBuilderPutRequestConfiguration $requestConfiguration = null): RequestInformation {
+    public function toPutRequestInformation(?UpdateCustomerData $body = null, ?WithExternalItemRequestBuilderPutRequestConfiguration $requestConfiguration = null): RequestInformation {
         $requestInfo = new RequestInformation();
         $requestInfo->urlTemplate = $this->urlTemplate;
         $requestInfo->pathParameters = $this->pathParameters;
@@ -116,7 +118,9 @@ class WithExternalItemRequestBuilder extends BaseRequestBuilder
             $requestInfo->addRequestOptions(...$requestConfiguration->options);
         }
         $requestInfo->tryAddHeader('Accept', "application/json");
-        $requestInfo->setContentFromParsable($this->requestAdapter, "application/json", $body);
+        if ($body !== null) {
+            $requestInfo->setContentFromParsable($this->requestAdapter, "application/json", $body);
+        }
         return $requestInfo;
     }
 

@@ -13,6 +13,8 @@ use Puntjes\Generated\Models\CreateTransactionData;
 use Puntjes\Generated\Models\SendLoyaltyCardRequestData;
 use Puntjes\Generated\Models\UpdateCustomerData;
 use Puntjes\Generated\Models\UpdateProductData;
+use Puntjes\Generated\Models\VerifyRedemptionData;
+use Puntjes\Tests\Support\RedemptionAnswer;
 use Puntjes\Tests\Support\TestCase;
 
 final class RequestAdapterTest extends TestCase
@@ -183,5 +185,33 @@ final class RequestAdapterTest extends TestCase
         $this->fake->queueRaw(200, "\n", ['Content-Type' => 'text/html']);
 
         self::assertNull($this->puntjes()->me()->get()->wait());
+    }
+
+    public function test_an_optional_body_left_out_sends_a_request_without_a_body(): void
+    {
+        $this->fake->queueData(RedemptionAnswer::lookup([]));
+        $this->fake->queueData(['code' => 'BON-1']);
+        $client = $this->puntjes();
+
+        $client->redemptions()->byCode('ABC-123')->verify()->post()->wait();
+        self::assertSame('/api/v1/redemptions/ABC-123/verify', $this->fake->lastRequest()->getUri()->getPath());
+        self::assertSame('', (string) $this->fake->lastRequest()->getBody());
+        self::assertFalse($this->fake->lastRequest()->hasHeader('Content-Type'));
+
+        $client->vouchers()->byCode('BON-1')->verify()->post()->wait();
+        self::assertSame('/api/v1/vouchers/BON-1/verify', $this->fake->lastRequest()->getUri()->getPath());
+        self::assertSame('', (string) $this->fake->lastRequest()->getBody());
+    }
+
+    public function test_an_optional_body_that_is_given_is_sent_as_json(): void
+    {
+        $this->fake->queueData(RedemptionAnswer::lookup([]));
+        $body = new VerifyRedemptionData;
+        $body->setBranch('centrum');
+
+        $this->puntjes()->redemptions()->byCode('ABC-123')->verify()->post($body)->wait();
+
+        self::assertSame('{"branch":"centrum"}', (string) $this->fake->lastRequest()->getBody());
+        self::assertSame('application/json', $this->fake->lastRequest()->getHeaderLine('Content-Type'));
     }
 }

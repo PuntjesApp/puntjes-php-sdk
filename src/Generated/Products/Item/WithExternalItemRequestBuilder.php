@@ -75,12 +75,12 @@ class WithExternalItemRequestBuilder extends BaseRequestBuilder
     }
 
     /**
-     * @param UpdateProductData $body The request body
+     * @param UpdateProductData|null $body The request body
      * @param WithExternalItemRequestBuilderPatchRequestConfiguration|null $requestConfiguration Configuration for the request such as headers, query parameters, and middleware options.
      * @return Promise<WithExternalPatchResponse|null>
      * @throws Exception
     */
-    public function patch(UpdateProductData $body, ?WithExternalItemRequestBuilderPatchRequestConfiguration $requestConfiguration = null): Promise {
+    public function patch(?UpdateProductData $body = null, ?WithExternalItemRequestBuilderPatchRequestConfiguration $requestConfiguration = null): Promise {
         $requestInfo = $this->toPatchRequestInformation($body, $requestConfiguration);
         $errorMappings = [
                 '400' => [ErrorResponse::class, 'createFromDiscriminatorValue'],
@@ -150,11 +150,11 @@ class WithExternalItemRequestBuilder extends BaseRequestBuilder
     }
 
     /**
-     * @param UpdateProductData $body The request body
+     * @param UpdateProductData|null $body The request body
      * @param WithExternalItemRequestBuilderPatchRequestConfiguration|null $requestConfiguration Configuration for the request such as headers, query parameters, and middleware options.
      * @return RequestInformation
     */
-    public function toPatchRequestInformation(UpdateProductData $body, ?WithExternalItemRequestBuilderPatchRequestConfiguration $requestConfiguration = null): RequestInformation {
+    public function toPatchRequestInformation(?UpdateProductData $body = null, ?WithExternalItemRequestBuilderPatchRequestConfiguration $requestConfiguration = null): RequestInformation {
         $requestInfo = new RequestInformation();
         $requestInfo->urlTemplate = $this->urlTemplate;
         $requestInfo->pathParameters = $this->pathParameters;
@@ -164,7 +164,9 @@ class WithExternalItemRequestBuilder extends BaseRequestBuilder
             $requestInfo->addRequestOptions(...$requestConfiguration->options);
         }
         $requestInfo->tryAddHeader('Accept', "application/json");
-        $requestInfo->setContentFromParsable($this->requestAdapter, "application/json", $body);
+        if ($body !== null) {
+            $requestInfo->setContentFromParsable($this->requestAdapter, "application/json", $body);
+        }
         return $requestInfo;
     }
 

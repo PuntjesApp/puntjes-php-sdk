@@ -24,3 +24,5 @@ docker run --rm -u "$(id -u):$(id -g)" -v "$root:/app" -w /app "$php" \
 mkdir -p "$root/src/Generated/Security"
 docker run --rm -u "$(id -u):$(id -g)" -v "$root:/app" -w /app "$php" \
   php scripts/public-operations.php spec/api.json src/Generated/Security/PublicOperations.php
+docker run --rm -u "$(id -u):$(id -g)" -v "$root:/app" -w /app "$php" \
+  php scripts/optional-bodies.php spec/api.json src/Generated
