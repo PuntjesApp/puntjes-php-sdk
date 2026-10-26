@@ -55,6 +55,11 @@ class CustomerDetailData implements AdditionalDataHolder, Parsable
     private ?string $first_name = null;
     
     /**
+     * @var array<CustomerGroupReferenceData>|null $groups The customer's groups, sorted by name, then by external_id.
+    */
+    private ?array $groups = null;
+    
+    /**
      * @var int|null $id The id property
     */
     private ?int $id = null;
@@ -123,6 +128,11 @@ class CustomerDetailData implements AdditionalDataHolder, Parsable
      * @var string|null $marketingConsentWithdrawnSource The marketingConsentWithdrawnSource property
     */
     private ?string $marketingConsentWithdrawnSource = null;
+    
+    /**
+     * @var int|null $merged_into_customer_id The account a merge moved this closed account into, else `null`.
+    */
+    private ?int $merged_into_customer_id = null;
     
     /**
      * @var string|null $phone The phone property
@@ -234,6 +244,7 @@ class CustomerDetailData implements AdditionalDataHolder, Parsable
             'email' => fn(ParseNode $n) => $o->setEmail($n->getStringValue()),
             'external_id' => fn(ParseNode $n) => $o->setExternalId($n->getStringValue()),
             'first_name' => fn(ParseNode $n) => $o->setFirstName($n->getStringValue()),
+            'groups' => fn(ParseNode $n) => $o->setGroups($n->getCollectionOfObjectValues([CustomerGroupReferenceData::class, 'createFromDiscriminatorValue'])),
             'id' => fn(ParseNode $n) => $o->setId($n->getIntegerValue()),
             'identifiers' => fn(ParseNode $n) => $o->setIdentifiers($n->getCollectionOfObjectValues([CustomerIdentifierData::class, 'createFromDiscriminatorValue'])),
             'is_deactivated' => fn(ParseNode $n) => $o->setIsDeactivated($n->getBooleanValue()),
@@ -248,6 +259,7 @@ class CustomerDetailData implements AdditionalDataHolder, Parsable
             'marketingConsentStatementVersion' => fn(ParseNode $n) => $o->setMarketingConsentStatementVersion($n->getStringValue()),
             'marketingConsentWithdrawnAt' => fn(ParseNode $n) => $o->setMarketingConsentWithdrawnAt($n->getStringValue()),
             'marketingConsentWithdrawnSource' => fn(ParseNode $n) => $o->setMarketingConsentWithdrawnSource($n->getStringValue()),
+            'merged_into_customer_id' => fn(ParseNode $n) => $o->setMergedIntoCustomerId($n->getIntegerValue()),
             'phone' => fn(ParseNode $n) => $o->setPhone($n->getStringValue()),
             'status' => fn(ParseNode $n) => $o->setStatus($n->getObjectValue([CustomerStatusData::class, 'createFromDiscriminatorValue'])),
             'updated_at' => fn(ParseNode $n) => $o->setUpdatedAt($n->getStringValue()),
@@ -260,6 +272,14 @@ class CustomerDetailData implements AdditionalDataHolder, Parsable
     */
     public function getFirstName(): ?string {
         return $this->first_name;
+    }
+
+    /**
+     * Gets the groups property value. The customer's groups, sorted by name, then by external_id.
+     * @return array<CustomerGroupReferenceData>|null
+    */
+    public function getGroups(): ?array {
+        return $this->groups;
     }
 
     /**
@@ -375,6 +395,14 @@ class CustomerDetailData implements AdditionalDataHolder, Parsable
     }
 
     /**
+     * Gets the merged_into_customer_id property value. The account a merge moved this closed account into, else `null`.
+     * @return int|null
+    */
+    public function getMergedIntoCustomerId(): ?int {
+        return $this->merged_into_customer_id;
+    }
+
+    /**
      * Gets the phone property value. The phone property
      * @return string|null
     */
@@ -411,6 +439,7 @@ class CustomerDetailData implements AdditionalDataHolder, Parsable
         $writer->writeStringValue('email', $this->getEmail());
         $writer->writeStringValue('external_id', $this->getExternalId());
         $writer->writeStringValue('first_name', $this->getFirstName());
+        $writer->writeCollectionOfObjectValues('groups', $this->getGroups());
         $writer->writeIntegerValue('id', $this->getId());
         $writer->writeCollectionOfObjectValues('identifiers', $this->getIdentifiers());
         $writer->writeBooleanValue('is_deactivated', $this->getIsDeactivated());
@@ -425,6 +454,7 @@ class CustomerDetailData implements AdditionalDataHolder, Parsable
         $writer->writeStringValue('marketingConsentStatementVersion', $this->getMarketingConsentStatementVersion());
         $writer->writeStringValue('marketingConsentWithdrawnAt', $this->getMarketingConsentWithdrawnAt());
         $writer->writeStringValue('marketingConsentWithdrawnSource', $this->getMarketingConsentWithdrawnSource());
+        $writer->writeIntegerValue('merged_into_customer_id', $this->getMergedIntoCustomerId());
         $writer->writeStringValue('phone', $this->getPhone());
         $writer->writeObjectValue('status', $this->getStatus());
         $writer->writeStringValue('updated_at', $this->getUpdatedAt());
@@ -501,6 +531,14 @@ class CustomerDetailData implements AdditionalDataHolder, Parsable
     */
     public function setFirstName(?string $value): void {
         $this->first_name = $value;
+    }
+
+    /**
+     * Sets the groups property value. The customer's groups, sorted by name, then by external_id.
+     * @param array<CustomerGroupReferenceData>|null $value Value to set for the groups property.
+    */
+    public function setGroups(?array $value): void {
+        $this->groups = $value;
     }
 
     /**
@@ -613,6 +651,14 @@ class CustomerDetailData implements AdditionalDataHolder, Parsable
     */
     public function setMarketingConsentWithdrawnSource(?string $value): void {
         $this->marketingConsentWithdrawnSource = $value;
+    }
+
+    /**
+     * Sets the merged_into_customer_id property value. The account a merge moved this closed account into, else `null`.
+     * @param int|null $value Value to set for the merged_into_customer_id property.
+    */
+    public function setMergedIntoCustomerId(?int $value): void {
+        $this->merged_into_customer_id = $value;
     }
 
     /**

@@ -15,17 +15,27 @@ class CampaignVoucherLookupData implements AdditionalDataHolder, Parsable
     private ?array $additionalData = null;
     
     /**
+     * @var bool|null $blocked_by_group Only true when `status` is `valid` and the customer is a member of none of its customer groups.
+    */
+    private ?bool $blocked_by_group = null;
+    
+    /**
      * @var int|null $campaign_id The campaign_id property
     */
     private ?int $campaign_id = null;
     
     /**
-     * @var string|null $consumed_at When the bon was spent, or null while it is not.
+     * @var string|null $consumed_at When the voucher was spent, or null while it is not.
     */
     private ?string $consumed_at = null;
     
     /**
-     * @var CampaignVoucherLookupData_discount|null $discount How much comes off, for a discount bon. Its `type` says which shape this is.
+     * @var array<CustomerGroupReferenceData>|null $customer_groups Groups that may spend it; empty means every customer.
+    */
+    private ?array $customer_groups = null;
+    
+    /**
+     * @var CampaignVoucherLookupData_discount|null $discount How much comes off, for a discount voucher. Its `type` says which shape this is.
     */
     private ?CampaignVoucherLookupData_discount $discount = null;
     
@@ -35,7 +45,7 @@ class CampaignVoucherLookupData implements AdditionalDataHolder, Parsable
     private ?string $kind = null;
     
     /**
-     * @var array<VoucherGiftProductData>|null $products What to hand over, for a free-product bon.
+     * @var array<VoucherGiftProductData>|null $products What to hand over, for a free-product voucher.
     */
     private ?array $products = null;
     
@@ -79,6 +89,14 @@ class CampaignVoucherLookupData implements AdditionalDataHolder, Parsable
     }
 
     /**
+     * Gets the blocked_by_group property value. Only true when `status` is `valid` and the customer is a member of none of its customer groups.
+     * @return bool|null
+    */
+    public function getBlockedByGroup(): ?bool {
+        return $this->blocked_by_group;
+    }
+
+    /**
      * Gets the campaign_id property value. The campaign_id property
      * @return int|null
     */
@@ -87,7 +105,7 @@ class CampaignVoucherLookupData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Gets the consumed_at property value. When the bon was spent, or null while it is not.
+     * Gets the consumed_at property value. When the voucher was spent, or null while it is not.
      * @return string|null
     */
     public function getConsumedAt(): ?string {
@@ -95,7 +113,15 @@ class CampaignVoucherLookupData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Gets the discount property value. How much comes off, for a discount bon. Its `type` says which shape this is.
+     * Gets the customer_groups property value. Groups that may spend it; empty means every customer.
+     * @return array<CustomerGroupReferenceData>|null
+    */
+    public function getCustomerGroups(): ?array {
+        return $this->customer_groups;
+    }
+
+    /**
+     * Gets the discount property value. How much comes off, for a discount voucher. Its `type` says which shape this is.
      * @return CampaignVoucherLookupData_discount|null
     */
     public function getDiscount(): ?CampaignVoucherLookupData_discount {
@@ -109,8 +135,10 @@ class CampaignVoucherLookupData implements AdditionalDataHolder, Parsable
     public function getFieldDeserializers(): array {
         $o = $this;
         return  [
+            'blocked_by_group' => fn(ParseNode $n) => $o->setBlockedByGroup($n->getBooleanValue()),
             'campaign_id' => fn(ParseNode $n) => $o->setCampaignId($n->getIntegerValue()),
             'consumed_at' => fn(ParseNode $n) => $o->setConsumedAt($n->getStringValue()),
+            'customer_groups' => fn(ParseNode $n) => $o->setCustomerGroups($n->getCollectionOfObjectValues([CustomerGroupReferenceData::class, 'createFromDiscriminatorValue'])),
             'discount' => fn(ParseNode $n) => $o->setDiscount($n->getObjectValue([CampaignVoucherLookupData_discount::class, 'createFromDiscriminatorValue'])),
             'kind' => fn(ParseNode $n) => $o->setKind($n->getStringValue()),
             'products' => fn(ParseNode $n) => $o->setProducts($n->getCollectionOfObjectValues([VoucherGiftProductData::class, 'createFromDiscriminatorValue'])),
@@ -129,7 +157,7 @@ class CampaignVoucherLookupData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Gets the products property value. What to hand over, for a free-product bon.
+     * Gets the products property value. What to hand over, for a free-product voucher.
      * @return array<VoucherGiftProductData>|null
     */
     public function getProducts(): ?array {
@@ -165,8 +193,10 @@ class CampaignVoucherLookupData implements AdditionalDataHolder, Parsable
      * @param SerializationWriter $writer Serialization writer to use to serialize this model
     */
     public function serialize(SerializationWriter $writer): void {
+        $writer->writeBooleanValue('blocked_by_group', $this->getBlockedByGroup());
         $writer->writeIntegerValue('campaign_id', $this->getCampaignId());
         $writer->writeStringValue('consumed_at', $this->getConsumedAt());
+        $writer->writeCollectionOfObjectValues('customer_groups', $this->getCustomerGroups());
         $writer->writeObjectValue('discount', $this->getDiscount());
         $writer->writeStringValue('kind', $this->getKind());
         $writer->writeCollectionOfObjectValues('products', $this->getProducts());
@@ -185,6 +215,14 @@ class CampaignVoucherLookupData implements AdditionalDataHolder, Parsable
     }
 
     /**
+     * Sets the blocked_by_group property value. Only true when `status` is `valid` and the customer is a member of none of its customer groups.
+     * @param bool|null $value Value to set for the blocked_by_group property.
+    */
+    public function setBlockedByGroup(?bool $value): void {
+        $this->blocked_by_group = $value;
+    }
+
+    /**
      * Sets the campaign_id property value. The campaign_id property
      * @param int|null $value Value to set for the campaign_id property.
     */
@@ -193,7 +231,7 @@ class CampaignVoucherLookupData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Sets the consumed_at property value. When the bon was spent, or null while it is not.
+     * Sets the consumed_at property value. When the voucher was spent, or null while it is not.
      * @param string|null $value Value to set for the consumed_at property.
     */
     public function setConsumedAt(?string $value): void {
@@ -201,7 +239,15 @@ class CampaignVoucherLookupData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Sets the discount property value. How much comes off, for a discount bon. Its `type` says which shape this is.
+     * Sets the customer_groups property value. Groups that may spend it; empty means every customer.
+     * @param array<CustomerGroupReferenceData>|null $value Value to set for the customer_groups property.
+    */
+    public function setCustomerGroups(?array $value): void {
+        $this->customer_groups = $value;
+    }
+
+    /**
+     * Sets the discount property value. How much comes off, for a discount voucher. Its `type` says which shape this is.
      * @param CampaignVoucherLookupData_discount|null $value Value to set for the discount property.
     */
     public function setDiscount(?CampaignVoucherLookupData_discount $value): void {
@@ -217,7 +263,7 @@ class CampaignVoucherLookupData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Sets the products property value. What to hand over, for a free-product bon.
+     * Sets the products property value. What to hand over, for a free-product voucher.
      * @param array<VoucherGiftProductData>|null $value Value to set for the products property.
     */
     public function setProducts(?array $value): void {

@@ -55,6 +55,11 @@ class CustomerData implements AdditionalDataHolder, Parsable
     private ?string $first_name = null;
     
     /**
+     * @var array<CustomerGroupReferenceData>|null $groups The customer's groups, sorted by name, then by external_id.
+    */
+    private ?array $groups = null;
+    
+    /**
      * @var int|null $id The id property
     */
     private ?int $id = null;
@@ -229,6 +234,7 @@ class CustomerData implements AdditionalDataHolder, Parsable
             'email' => fn(ParseNode $n) => $o->setEmail($n->getStringValue()),
             'external_id' => fn(ParseNode $n) => $o->setExternalId($n->getStringValue()),
             'first_name' => fn(ParseNode $n) => $o->setFirstName($n->getStringValue()),
+            'groups' => fn(ParseNode $n) => $o->setGroups($n->getCollectionOfObjectValues([CustomerGroupReferenceData::class, 'createFromDiscriminatorValue'])),
             'id' => fn(ParseNode $n) => $o->setId($n->getIntegerValue()),
             'identifiers' => fn(ParseNode $n) => $o->setIdentifiers($n->getCollectionOfObjectValues([CustomerIdentifierData::class, 'createFromDiscriminatorValue'])),
             'last_name' => fn(ParseNode $n) => $o->setLastName($n->getStringValue()),
@@ -254,6 +260,14 @@ class CustomerData implements AdditionalDataHolder, Parsable
     */
     public function getFirstName(): ?string {
         return $this->first_name;
+    }
+
+    /**
+     * Gets the groups property value. The customer's groups, sorted by name, then by external_id.
+     * @return array<CustomerGroupReferenceData>|null
+    */
+    public function getGroups(): ?array {
+        return $this->groups;
     }
 
     /**
@@ -397,6 +411,7 @@ class CustomerData implements AdditionalDataHolder, Parsable
         $writer->writeStringValue('email', $this->getEmail());
         $writer->writeStringValue('external_id', $this->getExternalId());
         $writer->writeStringValue('first_name', $this->getFirstName());
+        $writer->writeCollectionOfObjectValues('groups', $this->getGroups());
         $writer->writeIntegerValue('id', $this->getId());
         $writer->writeCollectionOfObjectValues('identifiers', $this->getIdentifiers());
         $writer->writeStringValue('last_name', $this->getLastName());
@@ -486,6 +501,14 @@ class CustomerData implements AdditionalDataHolder, Parsable
     */
     public function setFirstName(?string $value): void {
         $this->first_name = $value;
+    }
+
+    /**
+     * Sets the groups property value. The customer's groups, sorted by name, then by external_id.
+     * @param array<CustomerGroupReferenceData>|null $value Value to set for the groups property.
+    */
+    public function setGroups(?array $value): void {
+        $this->groups = $value;
     }
 
     /**

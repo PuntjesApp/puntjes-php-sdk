@@ -20,12 +20,12 @@ class VoucherGiftProductData implements AdditionalDataHolder, Parsable
     private ?int $id = null;
     
     /**
-     * @var string|null $name The product name as it was when the bon was issued.
+     * @var string|null $name The product name as it was when the voucher was issued.
     */
     private ?string $name = null;
     
     /**
-     * @var string|null $product_reference The item number when the bon was issued, or null when it had none.
+     * @var string|null $product_reference The item number when the voucher was issued, or null when it had none.
     */
     private ?string $product_reference = null;
     
@@ -81,7 +81,7 @@ class VoucherGiftProductData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Gets the name property value. The product name as it was when the bon was issued.
+     * Gets the name property value. The product name as it was when the voucher was issued.
      * @return string|null
     */
     public function getName(): ?string {
@@ -89,7 +89,7 @@ class VoucherGiftProductData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Gets the product_reference property value. The item number when the bon was issued, or null when it had none.
+     * Gets the product_reference property value. The item number when the voucher was issued, or null when it had none.
      * @return string|null
     */
     public function getProductReference(): ?string {
@@ -133,7 +133,7 @@ class VoucherGiftProductData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Sets the name property value. The product name as it was when the bon was issued.
+     * Sets the name property value. The product name as it was when the voucher was issued.
      * @param string|null $value Value to set for the name property.
     */
     public function setName(?string $value): void {
@@ -141,7 +141,7 @@ class VoucherGiftProductData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Sets the product_reference property value. The item number when the bon was issued, or null when it had none.
+     * Sets the product_reference property value. The item number when the voucher was issued, or null when it had none.
      * @param string|null $value Value to set for the product_reference property.
     */
     public function setProductReference(?string $value): void {
