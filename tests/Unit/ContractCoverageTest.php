@@ -8,23 +8,39 @@ use PHPUnit\Framework\TestCase;
 
 final class ContractCoverageTest extends TestCase
 {
+    public function test_it_lists_the_operations_no_contract_test_hits_in_code(): void
+    {
+        [$exit, $uncovered] = self::uncovered(__DIR__.'/../Fixtures/contract-coverage-spec.json', [__DIR__.'/../Fixtures/contract-coverage-suite.txt']);
+
+        self::assertSame(0, $exit);
+        self::assertSame(['listProducts', 'createProduct', 'deleteVoucher'], $uncovered);
+    }
+
+    public function test_it_refuses_a_spec_it_cannot_read(): void
+    {
+        [$exit] = self::uncovered(__DIR__.'/../Fixtures/missing.json', [__DIR__.'/../Fixtures/contract-coverage-suite.txt']);
+
+        self::assertSame(1, $exit);
+    }
+
     public function test_every_operation_in_the_spec_has_a_contract_test(): void
     {
-        $spec = json_decode((string) file_get_contents(__DIR__.'/../../spec/api.json'), true);
-        $operations = [];
+        [$exit, $uncovered] = self::uncovered(__DIR__.'/../../spec/api.json', (array) glob(__DIR__.'/../Contract/*.php'));
 
-        foreach ($spec['paths'] as $verbs) {
-            foreach ($verbs as $verb => $operation) {
-                if (in_array($verb, ['get', 'post', 'put', 'patch', 'delete'], true)) {
-                    $operations[] = $operation['operationId'];
-                }
-            }
-        }
+        self::assertSame(0, $exit);
+        self::assertSame([], $uncovered);
+    }
 
-        $suite = implode("\n", array_map('file_get_contents', (array) glob(__DIR__.'/../Contract/*.php')));
-        preg_match_all("/Live::hit\(self::CLIENT, '([A-Za-z]+)'\)/", $suite, $hits);
+    /**
+     * @param  list<string>  $suite
+     * @return array{0: int, 1: list<string>}
+     */
+    private static function uncovered(string $spec, array $suite): array
+    {
+        $command = 'php '.escapeshellarg(__DIR__.'/../../scripts/uncovered-operations.php').' '.escapeshellarg($spec)
+            .' '.implode(' ', array_map('escapeshellarg', $suite)).' 2>/dev/null';
+        exec($command, $out, $exit);
 
-        self::assertNotEmpty($hits[1]);
-        self::assertSame([], array_values(array_diff($operations, $hits[1])));
+        return [$exit, $out];
     }
 }

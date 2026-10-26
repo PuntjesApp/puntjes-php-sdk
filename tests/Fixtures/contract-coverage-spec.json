@@ -1,0 +1,7 @@
+{
+  "paths": {
+    "/health": {"get": {"operationId": "checkHealth"}},
+    "/products": {"get": {"operationId": "listProducts"}, "post": {"operationId": "createProduct"}, "parameters": []},
+    "/vouchers": {"delete": {"operationId": "deleteVoucher"}}
+  }
+}
