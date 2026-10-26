@@ -3,7 +3,10 @@
                 xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/Roave/BackwardCompatibilityCheck/8.23.x/Resources/schema.xsd">
     <!-- A request body that becomes optional (scripts/optional-bodies.php) breaks only a subclass of a generated
          builder, never a caller. Only the exact widening from T to T|null is ignored. -->
+    <!-- The API adds an error code in a minor version, and errorCode() already gives null for a code the SDK does
+         not know. Only an added case of ErrorCode is ignored; a removed case still fails. -->
     <baseline>
         <ignored-regex>#^\[BC\] CHANGED: The parameter \$body of Puntjes\\Generated\\[\w\\]+RequestBuilder\#(post|put|patch|to(Post|Put|Patch)RequestInformation)\(\) changed from ([\w\\]+) to \3\|null$#</ignored-regex>
+        <ignored-regex>#^\[BC\] ADDED: Case Puntjes\\Generated\\Errors\\ErrorCode::\w+ was added$#</ignored-regex>
     </baseline>
 </roave-bc-check>
