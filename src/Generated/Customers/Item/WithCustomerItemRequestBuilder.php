@@ -8,7 +8,9 @@ use Microsoft\Kiota\Abstractions\BaseRequestBuilder;
 use Microsoft\Kiota\Abstractions\HttpMethod;
 use Microsoft\Kiota\Abstractions\RequestAdapter;
 use Microsoft\Kiota\Abstractions\RequestInformation;
+use Puntjes\Generated\Customers\Item\ExternalId\ExternalIdRequestBuilder;
 use Puntjes\Generated\Customers\Item\Ledger\LedgerRequestBuilder;
+use Puntjes\Generated\Customers\Item\Merge\MergeRequestBuilder;
 use Puntjes\Generated\Customers\Item\Redemptions\RedemptionsRequestBuilder;
 use Puntjes\Generated\Customers\Item\SendCard\SendCardRequestBuilder;
 use Puntjes\Generated\Customers\Item\Transactions\TransactionsRequestBuilder;
@@ -23,10 +25,24 @@ use Puntjes\Generated\Models\ErrorResponse;
 class WithCustomerItemRequestBuilder extends BaseRequestBuilder 
 {
     /**
+     * The externalId property
+    */
+    public function externalId(): ExternalIdRequestBuilder {
+        return new ExternalIdRequestBuilder($this->pathParameters, $this->requestAdapter);
+    }
+    
+    /**
      * The ledger property
     */
     public function ledger(): LedgerRequestBuilder {
         return new LedgerRequestBuilder($this->pathParameters, $this->requestAdapter);
+    }
+    
+    /**
+     * The merge property
+    */
+    public function merge(): MergeRequestBuilder {
+        return new MergeRequestBuilder($this->pathParameters, $this->requestAdapter);
     }
     
     /**

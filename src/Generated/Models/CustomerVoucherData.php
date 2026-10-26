@@ -15,7 +15,7 @@ class CustomerVoucherData implements AdditionalDataHolder, Parsable
     private ?array $additionalData = null;
     
     /**
-     * @var array<BranchReferenceData>|null $branches The branches that take the bon; null means every branch.
+     * @var array<BranchReferenceData>|null $branches The branches that take the voucher; null means every branch.
     */
     private ?array $branches = null;
     
@@ -25,7 +25,7 @@ class CustomerVoucherData implements AdditionalDataHolder, Parsable
     private ?int $campaign_id = null;
     
     /**
-     * @var CustomerVoucherData_discount|null $discount How much comes off, for a discount bon. Its `type` says which shape this is.
+     * @var CustomerVoucherData_discount|null $discount How much comes off, for a discount voucher. Its `type` says which shape this is.
     */
     private ?CustomerVoucherData_discount $discount = null;
     
@@ -35,12 +35,12 @@ class CustomerVoucherData implements AdditionalDataHolder, Parsable
     private ?string $kind = null;
     
     /**
-     * @var array<VoucherGiftProductData>|null $products What to hand over, for a free-product bon.
+     * @var array<VoucherGiftProductData>|null $products What to hand over, for a free-product voucher.
     */
     private ?array $products = null;
     
     /**
-     * @var string|null $valid_until The last day the bon can be spent, or null when it does not run out.
+     * @var string|null $valid_until The last day the voucher can be spent, or null when it does not run out.
     */
     private ?string $valid_until = null;
     
@@ -74,7 +74,7 @@ class CustomerVoucherData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Gets the branches property value. The branches that take the bon; null means every branch.
+     * Gets the branches property value. The branches that take the voucher; null means every branch.
      * @return array<BranchReferenceData>|null
     */
     public function getBranches(): ?array {
@@ -90,7 +90,7 @@ class CustomerVoucherData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Gets the discount property value. How much comes off, for a discount bon. Its `type` says which shape this is.
+     * Gets the discount property value. How much comes off, for a discount voucher. Its `type` says which shape this is.
      * @return CustomerVoucherData_discount|null
     */
     public function getDiscount(): ?CustomerVoucherData_discount {
@@ -123,7 +123,7 @@ class CustomerVoucherData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Gets the products property value. What to hand over, for a free-product bon.
+     * Gets the products property value. What to hand over, for a free-product voucher.
      * @return array<VoucherGiftProductData>|null
     */
     public function getProducts(): ?array {
@@ -131,7 +131,7 @@ class CustomerVoucherData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Gets the valid_until property value. The last day the bon can be spent, or null when it does not run out.
+     * Gets the valid_until property value. The last day the voucher can be spent, or null when it does not run out.
      * @return string|null
     */
     public function getValidUntil(): ?string {
@@ -170,7 +170,7 @@ class CustomerVoucherData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Sets the branches property value. The branches that take the bon; null means every branch.
+     * Sets the branches property value. The branches that take the voucher; null means every branch.
      * @param array<BranchReferenceData>|null $value Value to set for the branches property.
     */
     public function setBranches(?array $value): void {
@@ -186,7 +186,7 @@ class CustomerVoucherData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Sets the discount property value. How much comes off, for a discount bon. Its `type` says which shape this is.
+     * Sets the discount property value. How much comes off, for a discount voucher. Its `type` says which shape this is.
      * @param CustomerVoucherData_discount|null $value Value to set for the discount property.
     */
     public function setDiscount(?CustomerVoucherData_discount $value): void {
@@ -202,7 +202,7 @@ class CustomerVoucherData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Sets the products property value. What to hand over, for a free-product bon.
+     * Sets the products property value. What to hand over, for a free-product voucher.
      * @param array<VoucherGiftProductData>|null $value Value to set for the products property.
     */
     public function setProducts(?array $value): void {
@@ -210,7 +210,7 @@ class CustomerVoucherData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Sets the valid_until property value. The last day the bon can be spent, or null when it does not run out.
+     * Sets the valid_until property value. The last day the voucher can be spent, or null when it does not run out.
      * @param string|null $value Value to set for the valid_until property.
     */
     public function setValidUntil(?string $value): void {

@@ -21,6 +21,11 @@ class MomentCampaignConfigData implements AdditionalDataHolder, Parsable
     private ?array $branch_ids = null;
     
     /**
+     * @var array<int>|null $customer_group_ids The groups this campaign is for. Absent or empty means everyone.
+    */
+    private ?array $customer_group_ids = null;
+    
+    /**
      * @var MomentCampaignConfigData_gift|null $gift What the customer gets. Its `type` says which shape this is.
     */
     private ?MomentCampaignConfigData_gift $gift = null;
@@ -63,6 +68,14 @@ class MomentCampaignConfigData implements AdditionalDataHolder, Parsable
     }
 
     /**
+     * Gets the customer_group_ids property value. The groups this campaign is for. Absent or empty means everyone.
+     * @return array<int>|null
+    */
+    public function getCustomerGroupIds(): ?array {
+        return $this->customer_group_ids;
+    }
+
+    /**
      * The deserialization information for the current model
      * @return array<string, callable(ParseNode): void>
     */
@@ -76,6 +89,14 @@ class MomentCampaignConfigData implements AdditionalDataHolder, Parsable
                 }
                 /** @var array<int>|null $val */
                 $this->setBranchIds($val);
+            },
+            'customer_group_ids' => function (ParseNode $n) {
+                $val = $n->getCollectionOfPrimitiveValues();
+                if (is_array($val)) {
+                    TypeUtils::validateCollectionValues($val, 'int');
+                }
+                /** @var array<int>|null $val */
+                $this->setCustomerGroupIds($val);
             },
             'gift' => fn(ParseNode $n) => $o->setGift($n->getObjectValue([MomentCampaignConfigData_gift::class, 'createFromDiscriminatorValue'])),
             'type' => fn(ParseNode $n) => $o->setType($n->getEnumValue(MomentCampaignConfigData_type::class)),
@@ -104,6 +125,7 @@ class MomentCampaignConfigData implements AdditionalDataHolder, Parsable
     */
     public function serialize(SerializationWriter $writer): void {
         $writer->writeCollectionOfPrimitiveValues('branch_ids', $this->getBranchIds());
+        $writer->writeCollectionOfPrimitiveValues('customer_group_ids', $this->getCustomerGroupIds());
         $writer->writeObjectValue('gift', $this->getGift());
         $writer->writeEnumValue('type', $this->getType());
         $writer->writeAdditionalData($this->getAdditionalData());
@@ -123,6 +145,14 @@ class MomentCampaignConfigData implements AdditionalDataHolder, Parsable
     */
     public function setBranchIds(?array $value): void {
         $this->branch_ids = $value;
+    }
+
+    /**
+     * Sets the customer_group_ids property value. The groups this campaign is for. Absent or empty means everyone.
+     * @param array<int>|null $value Value to set for the customer_group_ids property.
+    */
+    public function setCustomerGroupIds(?array $value): void {
+        $this->customer_group_ids = $value;
     }
 
     /**

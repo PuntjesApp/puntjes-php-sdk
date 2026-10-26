@@ -30,6 +30,11 @@ class CampaignListData implements AdditionalDataHolder, Parsable
     private ?string $created_at = null;
     
     /**
+     * @var array<CustomerGroupReferenceData>|null $customer_groups Who the campaign is for. Empty means every customer.
+    */
+    private ?array $customer_groups = null;
+    
+    /**
      * @var string|null $ends_at The ends_at property
     */
     private ?string $ends_at = null;
@@ -148,6 +153,14 @@ class CampaignListData implements AdditionalDataHolder, Parsable
     }
 
     /**
+     * Gets the customer_groups property value. Who the campaign is for. Empty means every customer.
+     * @return array<CustomerGroupReferenceData>|null
+    */
+    public function getCustomerGroups(): ?array {
+        return $this->customer_groups;
+    }
+
+    /**
      * Gets the ends_at property value. The ends_at property
      * @return string|null
     */
@@ -173,6 +186,7 @@ class CampaignListData implements AdditionalDataHolder, Parsable
             'branches' => fn(ParseNode $n) => $o->setBranches($n->getCollectionOfObjectValues([BranchReferenceData::class, 'createFromDiscriminatorValue'])),
             'config' => fn(ParseNode $n) => $o->setConfig($n->getObjectValue([CampaignListData_config::class, 'createFromDiscriminatorValue'])),
             'created_at' => fn(ParseNode $n) => $o->setCreatedAt($n->getStringValue()),
+            'customer_groups' => fn(ParseNode $n) => $o->setCustomerGroups($n->getCollectionOfObjectValues([CustomerGroupReferenceData::class, 'createFromDiscriminatorValue'])),
             'ends_at' => fn(ParseNode $n) => $o->setEndsAt($n->getStringValue()),
             'family' => fn(ParseNode $n) => $o->setFamily($n->getStringValue()),
             'id' => fn(ParseNode $n) => $o->setId($n->getIntegerValue()),
@@ -294,6 +308,7 @@ class CampaignListData implements AdditionalDataHolder, Parsable
         $writer->writeCollectionOfObjectValues('branches', $this->getBranches());
         $writer->writeObjectValue('config', $this->getConfig());
         $writer->writeStringValue('created_at', $this->getCreatedAt());
+        $writer->writeCollectionOfObjectValues('customer_groups', $this->getCustomerGroups());
         $writer->writeStringValue('ends_at', $this->getEndsAt());
         $writer->writeStringValue('family', $this->getFamily());
         $writer->writeIntegerValue('id', $this->getId());
@@ -341,6 +356,14 @@ class CampaignListData implements AdditionalDataHolder, Parsable
     */
     public function setCreatedAt(?string $value): void {
         $this->created_at = $value;
+    }
+
+    /**
+     * Sets the customer_groups property value. Who the campaign is for. Empty means every customer.
+     * @param array<CustomerGroupReferenceData>|null $value Value to set for the customer_groups property.
+    */
+    public function setCustomerGroups(?array $value): void {
+        $this->customer_groups = $value;
     }
 
     /**

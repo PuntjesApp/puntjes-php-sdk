@@ -40,6 +40,11 @@ class CreateCustomerData implements AdditionalDataHolder, Parsable
     private ?string $first_name = null;
     
     /**
+     * @var array<CustomerGroupReferenceData>|null $groups The groups property
+    */
+    private ?array $groups = null;
+    
+    /**
      * @var array<CreateIdentifierData>|null $identifiers The identifiers property
     */
     private ?array $identifiers = null;
@@ -137,6 +142,7 @@ class CreateCustomerData implements AdditionalDataHolder, Parsable
             'email' => fn(ParseNode $n) => $o->setEmail($n->getStringValue()),
             'external_id' => fn(ParseNode $n) => $o->setExternalId($n->getStringValue()),
             'first_name' => fn(ParseNode $n) => $o->setFirstName($n->getStringValue()),
+            'groups' => fn(ParseNode $n) => $o->setGroups($n->getCollectionOfObjectValues([CustomerGroupReferenceData::class, 'createFromDiscriminatorValue'])),
             'identifiers' => fn(ParseNode $n) => $o->setIdentifiers($n->getCollectionOfObjectValues([CreateIdentifierData::class, 'createFromDiscriminatorValue'])),
             'last_name' => fn(ParseNode $n) => $o->setLastName($n->getStringValue()),
             'locale' => fn(ParseNode $n) => $o->setLocale($n->getEnumValue(CreateCustomerData_locale::class)),
@@ -152,6 +158,14 @@ class CreateCustomerData implements AdditionalDataHolder, Parsable
     */
     public function getFirstName(): ?string {
         return $this->first_name;
+    }
+
+    /**
+     * Gets the groups property value. The groups property
+     * @return array<CustomerGroupReferenceData>|null
+    */
+    public function getGroups(): ?array {
+        return $this->groups;
     }
 
     /**
@@ -212,6 +226,7 @@ class CreateCustomerData implements AdditionalDataHolder, Parsable
         $writer->writeStringValue('email', $this->getEmail());
         $writer->writeStringValue('external_id', $this->getExternalId());
         $writer->writeStringValue('first_name', $this->getFirstName());
+        $writer->writeCollectionOfObjectValues('groups', $this->getGroups());
         $writer->writeCollectionOfObjectValues('identifiers', $this->getIdentifiers());
         $writer->writeStringValue('last_name', $this->getLastName());
         $writer->writeEnumValue('locale', $this->getLocale());
@@ -267,6 +282,14 @@ class CreateCustomerData implements AdditionalDataHolder, Parsable
     */
     public function setFirstName(?string $value): void {
         $this->first_name = $value;
+    }
+
+    /**
+     * Sets the groups property value. The groups property
+     * @param array<CustomerGroupReferenceData>|null $value Value to set for the groups property.
+    */
+    public function setGroups(?array $value): void {
+        $this->groups = $value;
     }
 
     /**

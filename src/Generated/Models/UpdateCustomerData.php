@@ -35,6 +35,11 @@ class UpdateCustomerData implements AdditionalDataHolder, Parsable
     private ?string $first_name = null;
     
     /**
+     * @var array<CustomerGroupReferenceData>|null $groups The groups property
+    */
+    private ?array $groups = null;
+    
+    /**
      * @var string|null $last_name The last_name property
     */
     private ?string $last_name = null;
@@ -118,6 +123,7 @@ class UpdateCustomerData implements AdditionalDataHolder, Parsable
             'date_of_birth' => fn(ParseNode $n) => $o->setDateOfBirth($n->getStringValue()),
             'email' => fn(ParseNode $n) => $o->setEmail($n->getStringValue()),
             'first_name' => fn(ParseNode $n) => $o->setFirstName($n->getStringValue()),
+            'groups' => fn(ParseNode $n) => $o->setGroups($n->getCollectionOfObjectValues([CustomerGroupReferenceData::class, 'createFromDiscriminatorValue'])),
             'last_name' => fn(ParseNode $n) => $o->setLastName($n->getStringValue()),
             'locale' => fn(ParseNode $n) => $o->setLocale($n->getEnumValue(UpdateCustomerData_locale::class)),
             'marketing_consent' => fn(ParseNode $n) => $o->setMarketingConsent($n->getBooleanValue()),
@@ -132,6 +138,14 @@ class UpdateCustomerData implements AdditionalDataHolder, Parsable
     */
     public function getFirstName(): ?string {
         return $this->first_name;
+    }
+
+    /**
+     * Gets the groups property value. The groups property
+     * @return array<CustomerGroupReferenceData>|null
+    */
+    public function getGroups(): ?array {
+        return $this->groups;
     }
 
     /**
@@ -183,6 +197,7 @@ class UpdateCustomerData implements AdditionalDataHolder, Parsable
         $writer->writeStringValue('date_of_birth', $this->getDateOfBirth());
         $writer->writeStringValue('email', $this->getEmail());
         $writer->writeStringValue('first_name', $this->getFirstName());
+        $writer->writeCollectionOfObjectValues('groups', $this->getGroups());
         $writer->writeStringValue('last_name', $this->getLastName());
         $writer->writeEnumValue('locale', $this->getLocale());
         $writer->writeBooleanValue('marketing_consent', $this->getMarketingConsent());
@@ -229,6 +244,14 @@ class UpdateCustomerData implements AdditionalDataHolder, Parsable
     */
     public function setFirstName(?string $value): void {
         $this->first_name = $value;
+    }
+
+    /**
+     * Sets the groups property value. The groups property
+     * @param array<CustomerGroupReferenceData>|null $value Value to set for the groups property.
+    */
+    public function setGroups(?array $value): void {
+        $this->groups = $value;
     }
 
     /**

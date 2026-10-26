@@ -25,6 +25,7 @@ enum ErrorCode: string
     case CustomerNotFound = 'CUSTOMER_NOT_FOUND';
     case ExternalIdDuplicate = 'EXTERNAL_ID_DUPLICATE';
     case ExternalIdNotFound = 'EXTERNAL_ID_NOT_FOUND';
+    case FeatureNotEnabled = 'FEATURE_NOT_ENABLED';
     case Forbidden = 'FORBIDDEN';
     case IdempotencyKeyConflict = 'IDEMPOTENCY_KEY_CONFLICT';
     case IdentifierDuplicate = 'IDENTIFIER_DUPLICATE';
@@ -59,6 +60,7 @@ enum ErrorCode: string
     case VerificationFailed = 'VERIFICATION_FAILED';
     case VoucherAlreadyUsed = 'VOUCHER_ALREADY_USED';
     case VoucherExpired = 'VOUCHER_EXPIRED';
+    case VoucherGroupRequired = 'VOUCHER_GROUP_REQUIRED';
     case VoucherNotFound = 'VOUCHER_NOT_FOUND';
     case WalletNotFound = 'WALLET_NOT_FOUND';
 
@@ -81,6 +83,7 @@ enum ErrorCode: string
             self::CustomerNotFound => 404,
             self::ExternalIdDuplicate => 409,
             self::ExternalIdNotFound => 404,
+            self::FeatureNotEnabled => 403,
             self::Forbidden => 403,
             self::IdempotencyKeyConflict => 422,
             self::IdentifierDuplicate => 409,
@@ -115,6 +118,7 @@ enum ErrorCode: string
             self::VerificationFailed => 422,
             self::VoucherAlreadyUsed => 422,
             self::VoucherExpired => 422,
+            self::VoucherGroupRequired => 422,
             self::VoucherNotFound => 404,
             self::WalletNotFound => 404,
         };

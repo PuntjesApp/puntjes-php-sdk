@@ -25,7 +25,7 @@ class CampaignVoucherVerificationData implements AdditionalDataHolder, Parsable
     private ?string $consumed_at = null;
     
     /**
-     * @var CampaignVoucherVerificationData_discount|null $discount How much comes off, for a discount bon. Its `type` says which shape this is.
+     * @var CampaignVoucherVerificationData_discount|null $discount How much comes off, for a discount voucher. Its `type` says which shape this is.
     */
     private ?CampaignVoucherVerificationData_discount $discount = null;
     
@@ -35,7 +35,7 @@ class CampaignVoucherVerificationData implements AdditionalDataHolder, Parsable
     private ?string $kind = null;
     
     /**
-     * @var array<VoucherGiftProductData>|null $products What to hand over, for a free-product bon.
+     * @var array<VoucherGiftProductData>|null $products What to hand over, for a free-product voucher.
     */
     private ?array $products = null;
     
@@ -90,7 +90,7 @@ class CampaignVoucherVerificationData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Gets the discount property value. How much comes off, for a discount bon. Its `type` says which shape this is.
+     * Gets the discount property value. How much comes off, for a discount voucher. Its `type` says which shape this is.
      * @return CampaignVoucherVerificationData_discount|null
     */
     public function getDiscount(): ?CampaignVoucherVerificationData_discount {
@@ -123,7 +123,7 @@ class CampaignVoucherVerificationData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Gets the products property value. What to hand over, for a free-product bon.
+     * Gets the products property value. What to hand over, for a free-product voucher.
      * @return array<VoucherGiftProductData>|null
     */
     public function getProducts(): ?array {
@@ -186,7 +186,7 @@ class CampaignVoucherVerificationData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Sets the discount property value. How much comes off, for a discount bon. Its `type` says which shape this is.
+     * Sets the discount property value. How much comes off, for a discount voucher. Its `type` says which shape this is.
      * @param CampaignVoucherVerificationData_discount|null $value Value to set for the discount property.
     */
     public function setDiscount(?CampaignVoucherVerificationData_discount $value): void {
@@ -202,7 +202,7 @@ class CampaignVoucherVerificationData implements AdditionalDataHolder, Parsable
     }
 
     /**
-     * Sets the products property value. What to hand over, for a free-product bon.
+     * Sets the products property value. What to hand over, for a free-product voucher.
      * @param array<VoucherGiftProductData>|null $value Value to set for the products property.
     */
     public function setProducts(?array $value): void {
