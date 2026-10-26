@@ -193,7 +193,8 @@ A 422 can be a bad field or a business refusal like `INSUFFICIENT_BALANCE`. Only
 field is a `ValidationException`, so catching it never hides a refusal you need to handle.
 
 `ErrorCode` lists every code the API documents. For a code that is newer than your SDK,
-`errorCode()` is null and `code()` still gives the raw string.
+`errorCode()` is null and `code()` still gives the raw string. A new code arrives in a minor
+release, so a `match` on `ErrorCode` needs a `default` arm.
 
 ## Token storage
 
