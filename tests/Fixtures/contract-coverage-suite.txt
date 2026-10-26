@@ -1,0 +1,16 @@
+<?php
+
+final class FixtureTest
+{
+    public function test_check_health(): void
+    {
+        Live::hit(self::CLIENT, 'checkHealth');
+    }
+
+    public function test_list_products(): void
+    {
+        // Live::hit(self::CLIENT, 'listProducts');
+        /* Live::hit(self::CLIENT, 'createProduct'); */
+        Live::hit('raw', 'deleteVoucher');
+    }
+}

@@ -324,6 +324,16 @@ composer test:contract
 With the variables unset, or a base URL that is not local, the suite fails. A refusal is a
 failure, never a skip, because a skipped suite is green with no call made.
 
+The shop of the API client needs more than a fresh install gives it: a paid plan that grants
+every feature, the shop's own switch for customer merge, and a voucher in `SPIKE_VOUCHER`.
+The Puntjes repository sets all three up for its `SDK Contract` check, in
+.github/scripts/ci-sdk-contract-seed.php and .github/scripts/ci-sdk-contract.sh. Run the suite
+the same way.
+
+Every operation in `spec/api.json` needs a contract test that calls
+`Live::hit(self::CLIENT, '<operationId>')`. The Unit suite fails when one has none, so a
+regenerated client with a new operation stays red until it gets that test.
+
 The suite also checks every answer against `spec/api.json`. A field the spec marks as
 always present fails the suite when the answer leaves it out, also when no test reads it.
 
