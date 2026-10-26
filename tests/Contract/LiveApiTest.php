@@ -336,6 +336,38 @@ final class LiveApiTest extends TestCase
         Live::hit(self::CLIENT, 'linkCustomerExternalId');
     }
 
+    public function test_change_customer_external_id(): void
+    {
+        $customer = new Models\CreateCustomerData;
+        $customer->setEmail(self::email('ext'));
+        $customer->setExternalId(self::sku('cust-ext'));
+        $id = (string) self::client()->customers()->post($customer)->wait()->getData()->getId();
+
+        $body = new Models\ChangeExternalIdData;
+        $body->setExternalId(self::sku('cust-ext2'));
+
+        self::assertSame(self::sku('cust-ext2'), self::client()->customers()->byCustomer($id)->externalId()->put($body)->wait()->getData()->getExternalId());
+        Live::hit(self::CLIENT, 'changeCustomerExternalId');
+    }
+
+    public function test_merge_customers(): void
+    {
+        $kept = new Models\CreateCustomerData;
+        $kept->setEmail(self::email('kept'));
+        $keptId = self::client()->customers()->post($kept)->wait()->getData()->getId();
+
+        $closed = new Models\CreateCustomerData;
+        $closed->setEmail(self::email('closed'));
+
+        $body = new Models\MergeCustomersApiData;
+        $body->setSource(self::client()->customers()->post($closed)->wait()->getData()->getId());
+        $body->setAddPoints(true);
+        $body->setIdempotencyKey(self::sku('merge'));
+
+        self::assertSame($keptId, self::client()->customers()->byCustomer((string) $keptId)->merge()->post($body)->wait()->getData()->getId());
+        Live::hit(self::CLIENT, 'mergeCustomers');
+    }
+
     public function test_submit_transaction(): void
     {
         $body = new Models\CreateTransactionData;
