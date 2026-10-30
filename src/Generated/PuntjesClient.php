@@ -11,9 +11,11 @@ use Microsoft\Kiota\Serialization\Text\TextParseNodeFactory;
 use Microsoft\Kiota\Serialization\Text\TextSerializationWriterFactory;
 use Puntjes\Generated\Branches\BranchesRequestBuilder;
 use Puntjes\Generated\Campaigns\CampaignsRequestBuilder;
+use Puntjes\Generated\Client\ClientRequestBuilder;
 use Puntjes\Generated\Customers\CustomersRequestBuilder;
 use Puntjes\Generated\Health\HealthRequestBuilder;
 use Puntjes\Generated\Me\MeRequestBuilder;
+use Puntjes\Generated\Partner\PartnerRequestBuilder;
 use Puntjes\Generated\Products\ProductsRequestBuilder;
 use Puntjes\Generated\Redemptions\RedemptionsRequestBuilder;
 use Puntjes\Generated\Rewards\RewardsRequestBuilder;
@@ -41,6 +43,13 @@ class PuntjesClient extends BaseRequestBuilder
     }
     
     /**
+     * The client property
+    */
+    public function client(): ClientRequestBuilder {
+        return new ClientRequestBuilder($this->pathParameters, $this->requestAdapter);
+    }
+    
+    /**
      * The customers property
     */
     public function customers(): CustomersRequestBuilder {
@@ -59,6 +68,13 @@ class PuntjesClient extends BaseRequestBuilder
     */
     public function me(): MeRequestBuilder {
         return new MeRequestBuilder($this->pathParameters, $this->requestAdapter);
+    }
+    
+    /**
+     * The partner property
+    */
+    public function partner(): PartnerRequestBuilder {
+        return new PartnerRequestBuilder($this->pathParameters, $this->requestAdapter);
     }
     
     /**
