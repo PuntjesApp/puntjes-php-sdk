@@ -15,9 +15,13 @@ enum ErrorCode: string
     case BranchNotFound = 'BRANCH_NOT_FOUND';
     case BranchRequired = 'BRANCH_REQUIRED';
     case CardSendThrottled = 'CARD_SEND_THROTTLED';
+    case ClientLimitReached = 'CLIENT_LIMIT_REACHED';
+    case ClientNotPartnerMade = 'CLIENT_NOT_PARTNER_MADE';
     case CodeAlreadyUsed = 'CODE_ALREADY_USED';
     case CodeCancelled = 'CODE_CANCELLED';
     case CodeExpired = 'CODE_EXPIRED';
+    case ConnectionExpired = 'CONNECTION_EXPIRED';
+    case ConnectionNotFound = 'CONNECTION_NOT_FOUND';
     case CustomerAlreadyLinked = 'CUSTOMER_ALREADY_LINKED';
     case CustomerDeactivated = 'CUSTOMER_DEACTIVATED';
     case CustomerEmailSuppressed = 'CUSTOMER_EMAIL_SUPPRESSED';
@@ -32,6 +36,7 @@ enum ErrorCode: string
     case InsufficientBalance = 'INSUFFICIENT_BALANCE';
     case InternalError = 'INTERNAL_ERROR';
     case InvalidClient = 'INVALID_CLIENT';
+    case InvalidClientSecret = 'INVALID_CLIENT_SECRET';
     case InvalidJson = 'INVALID_JSON';
     case LoyaltyCardNotFound = 'LOYALTY_CARD_NOT_FOUND';
     case MarketingConsentUnderAge = 'MARKETING_CONSENT_UNDER_AGE';
@@ -73,9 +78,13 @@ enum ErrorCode: string
             self::BranchNotFound => 422,
             self::BranchRequired => 422,
             self::CardSendThrottled => 429,
+            self::ClientLimitReached => 422,
+            self::ClientNotPartnerMade => 403,
             self::CodeAlreadyUsed => 422,
             self::CodeCancelled => 422,
             self::CodeExpired => 422,
+            self::ConnectionExpired => 422,
+            self::ConnectionNotFound => 404,
             self::CustomerAlreadyLinked => 409,
             self::CustomerDeactivated => 422,
             self::CustomerEmailSuppressed => 422,
@@ -90,6 +99,7 @@ enum ErrorCode: string
             self::InsufficientBalance => 422,
             self::InternalError => 500,
             self::InvalidClient => 401,
+            self::InvalidClientSecret => 401,
             self::InvalidJson => 400,
             self::LoyaltyCardNotFound => 422,
             self::MarketingConsentUnderAge => 422,
