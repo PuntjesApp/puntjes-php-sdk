@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Puntjes\Tests\Contract\Support;
 
+use PHPUnit\Framework\Assert;
 use RuntimeException;
 
 /**
@@ -49,6 +50,40 @@ final class Live
         return $voucher;
     }
 
+    /** The access token a partner got for the admin who allowed its connection. */
+    public static function partnerToken(): string
+    {
+        return self::env('PUNTJES_PARTNER_TOKEN');
+    }
+
+    /** The connection handle that admin's "Allow" gave the partner. */
+    public static function partnerConnection(): string
+    {
+        return self::env('PUNTJES_PARTNER_CONNECTION');
+    }
+
+    /** @return array{0: string, 1: string} two card codes on the shop's card list that no customer holds */
+    public static function loyaltyCards(): array
+    {
+        $codes = explode(',', self::env('PUNTJES_LOYALTY_CARDS'));
+
+        if (count($codes) !== 2) {
+            throw new RuntimeException('PUNTJES_LOYALTY_CARDS must hold two card codes, separated by a comma.');
+        }
+
+        return [$codes[0], $codes[1]];
+    }
+
+    /**
+     * Skips a test written before spec/api.json carries its operation; the test runs once the spec has it.
+     */
+    public static function requireOperation(string $operationId): void
+    {
+        if (! in_array($operationId, self::operations(), true)) {
+            Assert::markTestSkipped("spec/api.json does not carry {$operationId} yet.");
+        }
+    }
+
     public static function hit(string $client, string $operationId): void
     {
         self::$hits[$client][$operationId] = true;
@@ -56,6 +91,12 @@ final class Live
 
     /** @return list<string> */
     public static function missed(string $client): array
+    {
+        return array_values(array_diff(self::operations(), array_keys(self::$hits[$client] ?? [])));
+    }
+
+    /** @return list<string> every operationId in spec/api.json */
+    private static function operations(): array
     {
         $spec = json_decode((string) file_get_contents(__DIR__.'/../../../spec/api.json'), true);
         $all = [];
@@ -68,7 +109,7 @@ final class Live
             }
         }
 
-        return array_values(array_diff($all, array_keys(self::$hits[$client] ?? [])));
+        return $all;
     }
 
     public static function runId(): string
