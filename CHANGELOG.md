@@ -8,6 +8,13 @@ a breaking change waits for the next major, so `^1.0` is safe to pin and leave.
 From 2.0.0, [release-please](https://github.com/googleapis/release-please) writes new entries from the
 conventional commits. Moving from 1.x to 2.0: see [UPGRADING.md](UPGRADING.md).
 
+## [3.4.2](https://github.com/PuntjesApp/puntjes-php-sdk/compare/v3.4.1...v3.4.2) (2026-11-04)
+
+
+### Bug Fixes
+
+* regenerate from puntjes-openapi v2.4.1 ([#77](https://github.com/PuntjesApp/puntjes-php-sdk/issues/77)) ([4519526](https://github.com/PuntjesApp/puntjes-php-sdk/commit/451952697dd1d973904f1dcc0f24be568452af9b))
+
 ## [3.4.1](https://github.com/PuntjesApp/puntjes-php-sdk/compare/v3.4.0...v3.4.1) (2026-10-26)
 
 
