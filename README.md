@@ -10,11 +10,13 @@ The client is generated from the Puntjes OpenAPI spec, so it has every call the 
 - **Laravel**: install [`puntjes/laravel`](https://github.com/PuntjesApp/puntjes-laravel) on top for config, a facade and cache-backed tokens.
 - **WordPress / WooCommerce**: use this package directly, plus the [notes below](#wordpress--woocommerce).
 - **Coming from 1.x?** Read [`UPGRADING.md`](UPGRADING.md).
+- **Coming from 2.x?** 3.0.0 regenerated the client from spec v2.0.0, which gave the campaign
+  config and recurrence unions a discriminator and a class per shape. The [changelog](CHANGELOG.md) has the list.
 
 ## Install
 
 ```bash
-composer require puntjes/php-sdk:^2.0
+composer require puntjes/php-sdk:^3.0
 ```
 
 The SDK talks PSR-18, so it uses the HTTP client your project already has (Guzzle,
@@ -325,14 +327,22 @@ With the variables unset, or a base URL that is not local, the suite fails. A re
 failure, never a skip, because a skipped suite is green with no call made.
 
 The shop of the API client needs more than a fresh install gives it: a paid plan that grants
-every feature, the shop's own switch for customer merge, and a voucher in `SPIKE_VOUCHER`.
-The Puntjes repository sets all three up for its `SDK Contract` check, in
-.github/scripts/ci-sdk-contract-seed.php and .github/scripts/ci-sdk-contract.sh. Run the suite
-the same way.
+every feature, the shop's own switch for customer merge, a voucher in `SPIKE_VOUCHER`, two card
+codes nobody holds in `PUNTJES_LOYALTY_CARDS`, and for the partner operations a partner token in
+`PUNTJES_PARTNER_TOKEN` with the connection handle the shop's admin allowed in
+`PUNTJES_PARTNER_CONNECTION`. The Puntjes repository sets all of them up for its `SDK Contract`
+check, in .github/scripts/ci-sdk-contract-seed.php and .github/scripts/ci-sdk-contract.sh. Run
+the suite the same way.
 
 Every operation in `spec/api.json` needs a contract test that calls
 `Live::hit(self::CLIENT, '<operationId>')`. The Unit suite fails when one has none, so a
-regenerated client with a new operation stays red until it gets that test.
+regenerated client with a new operation stays red until it gets that test. Write the test on
+`main` before the Puntjes pull request that adds the operation merges: the Puntjes `SDK Contract`
+check regenerates `main` from that pull request's spec and runs this suite against it, so the
+test and the seed are proven before the spec is published. The generated class need not exist
+on `main` yet; PHPStan reads `src` only and the Unit suite never loads this directory. Such a
+test starts with `Live::requireOperation('<operationId>')`, so a release cut from `main` before
+the regenerate skips it instead of failing on a class that is not generated yet.
 
 The suite also checks every answer against `spec/api.json`. A field the spec marks as
 always present fails the suite when the answer leaves it out, also when no test reads it.
@@ -382,8 +392,9 @@ Three cases need a person:
 
 ## Versions
 
-2.x is the current line. 1.x gets security fixes for 6 months after 2.0.0 reaches Packagist,
-on the `1.x` branch. Moving from 1.x is described in [`UPGRADING.md`](UPGRADING.md).
+3.x is the current line, generated from the 2.x specs of `puntjes-openapi`. 2.x lived one day:
+3.0.0 replaced 2.0.0 on 2026-10-12. 1.x gets security fixes on the `1.x` branch until 2027-04-11,
+6 months after 2.0.0 reached Packagist. Moving from 1.x is described in [`UPGRADING.md`](UPGRADING.md).
 
 ## Links
 
