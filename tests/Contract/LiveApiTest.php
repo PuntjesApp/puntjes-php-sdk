@@ -7,7 +7,9 @@ namespace Puntjes\Tests\Contract;
 use PHPUnit\Framework\TestCase;
 use Puntjes\Auth\AccessToken;
 use Puntjes\Auth\InMemoryTokenStore;
+use Puntjes\Auth\TokenProvider;
 use Puntjes\Auth\TokenStore;
+use Puntjes\Config;
 use Puntjes\Exception\AuthenticationException;
 use Puntjes\Exception\NotFoundException;
 use Puntjes\Exception\ValidationException;
@@ -17,6 +19,9 @@ use Puntjes\Generated\Models;
 use Puntjes\Generated\Products\Batch\BatchPostRequestBody;
 use Puntjes\Generated\Products\ProductsRequestBuilderGetRequestConfiguration;
 use Puntjes\Generated\PuntjesClient;
+use Puntjes\Http\HttpClient;
+use Puntjes\Http\Psr18RequestAdapter;
+use Puntjes\Http\Transport;
 use Puntjes\Puntjes;
 use Puntjes\Tests\Contract\Support\CheckedHttpClient;
 use Puntjes\Tests\Contract\Support\Live;
@@ -24,7 +29,7 @@ use Puntjes\Tests\Contract\Support\RequiredFields;
 use Puntjes\WalletPass;
 
 /**
- * Calls all 37 operations through the generated 2.0 client, built the way a consumer builds it.
+ * Calls every operation through the generated client, built the way a consumer builds it.
  */
 final class LiveApiTest extends TestCase
 {
@@ -41,14 +46,45 @@ final class LiveApiTest extends TestCase
     {
         $tokenStore ??= $secret === null ? (self::$sharedStore ??= new InMemoryTokenStore) : null;
 
-        return Puntjes::make(
-            (string) getenv('PUNTJES_CLIENT_ID'),
-            $secret ?? (string) getenv('PUNTJES_CLIENT_SECRET'),
-            (string) preg_replace('#/api/v1$#', '', Live::baseUrl()),
-            $tokenStore,
-            httpClient: self::$http ??= new CheckedHttpClient(RequiredFields::fromSpecFile(), (string) parse_url(Live::baseUrl(), PHP_URL_PATH)),
-            maxRetries: 0,
-        );
+        return self::clientOf((string) getenv('PUNTJES_CLIENT_ID'), $secret ?? (string) getenv('PUNTJES_CLIENT_SECRET'), $tokenStore);
+    }
+
+    private static function clientOf(string $clientId, string $clientSecret, ?TokenStore $tokenStore = null): PuntjesClient
+    {
+        return Puntjes::make($clientId, $clientSecret, self::appUrl(), $tokenStore, httpClient: self::http(), maxRetries: 0);
+    }
+
+    /** The client a partner's box builds: the partner's own token, never a client credentials grant. */
+    private static function partnerClient(): PuntjesClient
+    {
+        $config = new Config('partner', 'partner-token', self::appUrl(), maxRetries: 0);
+        $tokens = new class(Live::partnerToken()) implements TokenProvider
+        {
+            public function __construct(private readonly string $token) {}
+
+            public function token(bool $forceRefresh = false): AccessToken
+            {
+                return new AccessToken($this->token, time() + 3600);
+            }
+        };
+
+        return new PuntjesClient(new Psr18RequestAdapter(new Transport($config, new HttpClient(self::http()), $tokens), rtrim($config->apiUrl(''), '/')));
+    }
+
+    private static function appUrl(): string
+    {
+        return (string) preg_replace('#/api/v1$#', '', Live::baseUrl());
+    }
+
+    private static function http(): CheckedHttpClient
+    {
+        return self::$http ??= new CheckedHttpClient(RequiredFields::fromSpecFile(), (string) parse_url(Live::baseUrl(), PHP_URL_PATH));
+    }
+
+    /** @return array{0: string, 1: string} the id and the current secret of the client the partner collected */
+    private static function madeClient(): array
+    {
+        return [(string) self::$state['made_client_id'], (string) self::$state['made_client_secret']];
     }
 
     public static function tearDownAfterClass(): void
@@ -498,6 +534,85 @@ final class LiveApiTest extends TestCase
         }
 
         Live::hit(self::CLIENT, 'sendLoyaltyCardByExternalId');
+    }
+
+    public function test_add_loyalty_card(): void
+    {
+        Live::requireOperation('addLoyaltyCard');
+        [$code] = Live::loyaltyCards();
+        $body = new Models\AddLoyaltyCardData;
+        $body->setCode($code);
+
+        $customer = self::client()->customers()->byCustomer(self::customer())->loyaltyCards()->post($body)->wait()->getData();
+
+        self::assertSame($code, $customer?->getLoyaltyCardCode());
+        Live::hit(self::CLIENT, 'addLoyaltyCard');
+    }
+
+    public function test_add_loyalty_card_by_external_id_replaces_the_card_given_back(): void
+    {
+        Live::requireOperation('addLoyaltyCardByExternalId');
+        [$givenBack, $code] = Live::loyaltyCards();
+        $body = new Models\AddLoyaltyCardData;
+        $body->setCode($code);
+        $body->setReplaces($givenBack);
+
+        $customer = self::client()->customers()->byExternalId()->byExternalId(self::sku('cust-a'))->loyaltyCards()->post($body)->wait()->getData();
+
+        self::assertSame($code, $customer?->getLoyaltyCardCode());
+        Live::hit(self::CLIENT, 'addLoyaltyCardByExternalId');
+    }
+
+    public function test_create_partner_api_client(): void
+    {
+        Live::requireOperation('createPartnerApiClient');
+        $body = new Models\CreatePartnerApiClientData;
+        $body->setConnection(Live::partnerConnection());
+        $body->setLabel('Contract till');
+
+        $made = self::partnerClient()->partner()->clients()->post($body)->wait()->getData();
+        Live::hit(self::CLIENT, 'createPartnerApiClient');
+
+        self::assertNotNull($made);
+        self::assertSame(self::client()->me()->get()->wait()->getData()->getDisplayName(), $made->getVendor()?->getName());
+        self::$state['made_client_id'] = (string) $made->getClientId();
+        self::$state['made_client_secret'] = (string) $made->getClientSecret();
+
+        self::assertNotSame('', self::clientOf(...self::madeClient())->me()->get()->wait()->getData()->getDisplayName());
+    }
+
+    public function test_rotate_client_secret(): void
+    {
+        Live::requireOperation('rotateClientSecret');
+        [$clientId, $secret] = self::madeClient();
+        $body = new Models\ClientSecretData;
+        $body->setClientSecret($secret);
+
+        $rotated = self::clientOf($clientId, $secret)->client()->secret()->post($body)->wait()->getData();
+        Live::hit(self::CLIENT, 'rotateClientSecret');
+
+        self::assertNotNull($rotated);
+        self::assertSame($clientId, $rotated->getClientId());
+        self::assertNotSame($secret, $rotated->getClientSecret());
+        self::$state['made_client_secret'] = (string) $rotated->getClientSecret();
+    }
+
+    public function test_delete_client(): void
+    {
+        Live::requireOperation('deleteClient');
+        [$clientId, $secret] = self::madeClient();
+        $body = new Models\ClientSecretData;
+        $body->setClientSecret($secret);
+
+        self::clientOf($clientId, $secret)->client()->delete($body)->wait();
+        Live::hit(self::CLIENT, 'deleteClient');
+
+        try {
+            self::clientOf($clientId, $secret, new InMemoryTokenStore)->me()->get()->wait();
+            self::fail('A deleted client still got a token.');
+        } catch (AuthenticationException $e) {
+            self::assertSame(401, $e->status());
+        }
     }
 
     public function test_delete_product(): void

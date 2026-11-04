@@ -325,14 +325,22 @@ With the variables unset, or a base URL that is not local, the suite fails. A re
 failure, never a skip, because a skipped suite is green with no call made.
 
 The shop of the API client needs more than a fresh install gives it: a paid plan that grants
-every feature, the shop's own switch for customer merge, and a voucher in `SPIKE_VOUCHER`.
-The Puntjes repository sets all three up for its `SDK Contract` check, in
-.github/scripts/ci-sdk-contract-seed.php and .github/scripts/ci-sdk-contract.sh. Run the suite
-the same way.
+every feature, the shop's own switch for customer merge, a voucher in `SPIKE_VOUCHER`, two card
+codes nobody holds in `PUNTJES_LOYALTY_CARDS`, and for the partner operations a partner token in
+`PUNTJES_PARTNER_TOKEN` with the connection handle the shop's admin allowed in
+`PUNTJES_PARTNER_CONNECTION`. The Puntjes repository sets all of them up for its `SDK Contract`
+check, in .github/scripts/ci-sdk-contract-seed.php and .github/scripts/ci-sdk-contract.sh. Run
+the suite the same way.
 
 Every operation in `spec/api.json` needs a contract test that calls
 `Live::hit(self::CLIENT, '<operationId>')`. The Unit suite fails when one has none, so a
-regenerated client with a new operation stays red until it gets that test.
+regenerated client with a new operation stays red until it gets that test. Write the test on
+`main` before the Puntjes pull request that adds the operation merges: the Puntjes `SDK Contract`
+check regenerates `main` from that pull request's spec and runs this suite against it, so the
+test and the seed are proven before the spec is published. The generated class need not exist
+on `main` yet; PHPStan reads `src` only and the Unit suite never loads this directory. Such a
+test starts with `Live::requireOperation('<operationId>')`, so a release cut from `main` before
+the regenerate skips it instead of failing on a class that is not generated yet.
 
 The suite also checks every answer against `spec/api.json`. A field the spec marks as
 always present fails the suite when the answer leaves it out, also when no test reads it.
