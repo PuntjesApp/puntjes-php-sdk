@@ -10,11 +10,13 @@ The client is generated from the Puntjes OpenAPI spec, so it has every call the 
 - **Laravel**: install [`puntjes/laravel`](https://github.com/PuntjesApp/puntjes-laravel) on top for config, a facade and cache-backed tokens.
 - **WordPress / WooCommerce**: use this package directly, plus the [notes below](#wordpress--woocommerce).
 - **Coming from 1.x?** Read [`UPGRADING.md`](UPGRADING.md).
+- **Coming from 2.x?** 3.0.0 regenerated the client from spec v2.0.0, which gave the campaign
+  config and recurrence unions a discriminator and a class per shape. The [changelog](CHANGELOG.md) has the list.
 
 ## Install
 
 ```bash
-composer require puntjes/php-sdk:^2.0
+composer require puntjes/php-sdk:^3.0
 ```
 
 The SDK talks PSR-18, so it uses the HTTP client your project already has (Guzzle,
@@ -390,8 +392,9 @@ Three cases need a person:
 
 ## Versions
 
-2.x is the current line. 1.x gets security fixes for 6 months after 2.0.0 reaches Packagist,
-on the `1.x` branch. Moving from 1.x is described in [`UPGRADING.md`](UPGRADING.md).
+3.x is the current line, generated from the 2.x specs of `puntjes-openapi`. 2.x lived one day:
+3.0.0 replaced 2.0.0 on 2026-10-12. 1.x gets security fixes on the `1.x` branch until 2027-04-11,
+6 months after 2.0.0 reached Packagist. Moving from 1.x is described in [`UPGRADING.md`](UPGRADING.md).
 
 ## Links
 
