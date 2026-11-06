@@ -10,6 +10,7 @@ use Microsoft\Kiota\Abstractions\RequestAdapter;
 use Microsoft\Kiota\Abstractions\RequestInformation;
 use Puntjes\Generated\Customers\Item\ExternalId\ExternalIdRequestBuilder;
 use Puntjes\Generated\Customers\Item\Ledger\LedgerRequestBuilder;
+use Puntjes\Generated\Customers\Item\LoyaltyCards\LoyaltyCardsRequestBuilder;
 use Puntjes\Generated\Customers\Item\Merge\MergeRequestBuilder;
 use Puntjes\Generated\Customers\Item\Redemptions\RedemptionsRequestBuilder;
 use Puntjes\Generated\Customers\Item\SendCard\SendCardRequestBuilder;
@@ -36,6 +37,13 @@ class WithCustomerItemRequestBuilder extends BaseRequestBuilder
     */
     public function ledger(): LedgerRequestBuilder {
         return new LedgerRequestBuilder($this->pathParameters, $this->requestAdapter);
+    }
+    
+    /**
+     * The loyaltyCards property
+    */
+    public function loyaltyCards(): LoyaltyCardsRequestBuilder {
+        return new LoyaltyCardsRequestBuilder($this->pathParameters, $this->requestAdapter);
     }
     
     /**
