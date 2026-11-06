@@ -38,6 +38,7 @@ enum ErrorCode: string
     case InvalidClient = 'INVALID_CLIENT';
     case InvalidClientSecret = 'INVALID_CLIENT_SECRET';
     case InvalidJson = 'INVALID_JSON';
+    case LoyaltyCardLimitReached = 'LOYALTY_CARD_LIMIT_REACHED';
     case LoyaltyCardNotFound = 'LOYALTY_CARD_NOT_FOUND';
     case MarketingConsentUnderAge = 'MARKETING_CONSENT_UNDER_AGE';
     case MethodNotAllowed = 'METHOD_NOT_ALLOWED';
@@ -101,6 +102,7 @@ enum ErrorCode: string
             self::InvalidClient => 401,
             self::InvalidClientSecret => 401,
             self::InvalidJson => 400,
+            self::LoyaltyCardLimitReached => 422,
             self::LoyaltyCardNotFound => 422,
             self::MarketingConsentUnderAge => 422,
             self::MethodNotAllowed => 405,

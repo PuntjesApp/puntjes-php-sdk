@@ -8,6 +8,7 @@ use Microsoft\Kiota\Abstractions\BaseRequestBuilder;
 use Microsoft\Kiota\Abstractions\HttpMethod;
 use Microsoft\Kiota\Abstractions\RequestAdapter;
 use Microsoft\Kiota\Abstractions\RequestInformation;
+use Puntjes\Generated\Customers\ByExternalId\Item\LoyaltyCards\LoyaltyCardsRequestBuilder;
 use Puntjes\Generated\Customers\ByExternalId\Item\SendCard\SendCardRequestBuilder;
 use Puntjes\Generated\Models\ErrorResponse;
 use Puntjes\Generated\Models\UpdateCustomerData;
@@ -17,6 +18,13 @@ use Puntjes\Generated\Models\UpdateCustomerData;
 */
 class WithExternalItemRequestBuilder extends BaseRequestBuilder 
 {
+    /**
+     * The loyaltyCards property
+    */
+    public function loyaltyCards(): LoyaltyCardsRequestBuilder {
+        return new LoyaltyCardsRequestBuilder($this->pathParameters, $this->requestAdapter);
+    }
+    
     /**
      * The sendCard property
     */
