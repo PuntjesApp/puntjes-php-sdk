@@ -563,6 +563,35 @@ final class LiveApiTest extends TestCase
         Live::hit(self::CLIENT, 'addLoyaltyCardByExternalId');
     }
 
+    public function test_lookup_gift_card(): void
+    {
+        Live::requireOperation('lookupGiftCard');
+        $body = new Models\LookupGiftCardApiData;
+        $body->setCode(Live::giftCard());
+
+        $giftCard = self::client()->giftCards()->lookup()->post($body)->wait()->getData();
+        Live::hit(self::CLIENT, 'lookupGiftCard');
+
+        self::assertSame(substr(Live::giftCard(), -4), $giftCard?->getCodeLast4());
+        self::assertSame(5000, $giftCard?->getAmountLeftCents());
+    }
+
+    public function test_redeem_gift_card_once_for_one_key(): void
+    {
+        Live::requireOperation('redeemGiftCard');
+        $body = new Models\RedeemGiftCardApiData;
+        $body->setCode(Live::giftCard());
+        $body->setAmountCents(1750);
+        $body->setIdempotencyKey(Live::runId().'-gift-card');
+
+        $first = self::client()->giftCards()->redeem()->post($body)->wait()->getData();
+        $retry = self::client()->giftCards()->redeem()->post($body)->wait()->getData();
+        Live::hit(self::CLIENT, 'redeemGiftCard');
+
+        self::assertSame(3250, $first?->getAmountLeftCents());
+        self::assertSame(3250, $retry?->getAmountLeftCents());
+    }
+
     public function test_create_partner_api_client(): void
     {
         Live::requireOperation('createPartnerApiClient');

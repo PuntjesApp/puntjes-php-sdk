@@ -62,6 +62,12 @@ final class Live
         return self::env('PUNTJES_PARTNER_CONNECTION');
     }
 
+    /** The code of a gift card of 50 euro that the seed makes for the shop */
+    public static function giftCard(): string
+    {
+        return self::env('PUNTJES_GIFT_CARD');
+    }
+
     /** @return array{0: string, 1: string} two card codes on the shop's card list that no customer holds */
     public static function loyaltyCards(): array
     {
