@@ -329,7 +329,7 @@ failure, never a skip, because a skipped suite is green with no call made.
 The shop of the API client needs more than a fresh install gives it: a paid plan that grants
 every feature, the shop's own switch for customer merge, a voucher in `SPIKE_VOUCHER`, two card
 codes nobody holds in `PUNTJES_LOYALTY_CARDS`, the code of a gift card of 50 euro in
-`PUNTJES_GIFT_CARD`, and for the partner operations a partner token in
+`PUNTJES_GIFT_CARD`, the codes of two blank gift cards in `PUNTJES_BLANK_GIFT_CARDS`, and for the partner operations a partner token in
 `PUNTJES_PARTNER_TOKEN` with the connection handle the shop's admin allowed in
 `PUNTJES_PARTNER_CONNECTION`. The Puntjes repository sets all of them up for its `SDK Contract`
 check, in .github/scripts/ci-sdk-contract-seed.php and .github/scripts/ci-sdk-contract.sh. Run

@@ -592,6 +592,36 @@ final class LiveApiTest extends TestCase
         self::assertSame(3250, $retry?->getAmountLeftCents());
     }
 
+    public function test_load_blank_gift_card_once_for_one_key(): void
+    {
+        Live::requireOperation('loadGiftCard');
+        $body = self::loadBlankGiftCardBody(Live::blankGiftCards()[0], '-load');
+
+        $first = self::client()->giftCards()->load()->post($body)->wait()->getData();
+        $retry = self::client()->giftCards()->load()->post($body)->wait()->getData();
+        Live::hit(self::CLIENT, 'loadGiftCard');
+
+        self::assertSame(substr(Live::blankGiftCards()[0], -4), $first?->getCodeLast4());
+        self::assertSame(2500, $first?->getAmountLeftCents());
+        self::assertSame(2500, $retry?->getAmountLeftCents());
+    }
+
+    public function test_undo_gift_card_load_leaves_nothing_on_the_card(): void
+    {
+        Live::requireOperation('loadGiftCard');
+        Live::requireOperation('undoGiftCardLoad');
+        $load = self::loadBlankGiftCardBody(Live::blankGiftCards()[1], '-undo');
+        self::client()->giftCards()->load()->post($load)->wait();
+        $body = new Models\UndoGiftCardLoadApiData;
+        $body->setCode(Live::blankGiftCards()[1]);
+        $body->setIdempotencyKey($load->getIdempotencyKey());
+
+        $undone = self::client()->giftCards()->load()->undo()->post($body)->wait()->getData();
+        Live::hit(self::CLIENT, 'undoGiftCardLoad');
+
+        self::assertSame(0, $undone?->getAmountLeftCents());
+    }
+
     public function test_create_partner_api_client(): void
     {
         Live::requireOperation('createPartnerApiClient');
@@ -664,5 +694,15 @@ final class LiveApiTest extends TestCase
     public function test_every_operation_was_called(): void
     {
         self::assertSame([], Live::missed(self::CLIENT));
+    }
+
+    private static function loadBlankGiftCardBody(string $code, string $suffix): Models\LoadGiftCardApiData
+    {
+        $body = new Models\LoadGiftCardApiData;
+        $body->setCode($code);
+        $body->setAmountCents(2500);
+        $body->setIdempotencyKey(Live::runId().$suffix);
+
+        return $body;
     }
 }

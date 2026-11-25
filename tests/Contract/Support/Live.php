@@ -68,6 +68,18 @@ final class Live
         return self::env('PUNTJES_GIFT_CARD');
     }
 
+    /** @return array{0: string, 1: string} the codes of two blank gift cards that the seed makes for the shop */
+    public static function blankGiftCards(): array
+    {
+        $codes = explode(',', self::env('PUNTJES_BLANK_GIFT_CARDS'));
+
+        if (count($codes) !== 2) {
+            throw new RuntimeException('PUNTJES_BLANK_GIFT_CARDS must hold two codes, separated by a comma.');
+        }
+
+        return [$codes[0], $codes[1]];
+    }
+
     /** @return array{0: string, 1: string} two card codes on the shop's card list that no customer holds */
     public static function loyaltyCards(): array
     {
