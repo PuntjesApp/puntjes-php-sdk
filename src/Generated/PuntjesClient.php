@@ -13,6 +13,7 @@ use Puntjes\Generated\Branches\BranchesRequestBuilder;
 use Puntjes\Generated\Campaigns\CampaignsRequestBuilder;
 use Puntjes\Generated\Client\ClientRequestBuilder;
 use Puntjes\Generated\Customers\CustomersRequestBuilder;
+use Puntjes\Generated\GiftCards\GiftCardsRequestBuilder;
 use Puntjes\Generated\Health\HealthRequestBuilder;
 use Puntjes\Generated\Me\MeRequestBuilder;
 use Puntjes\Generated\Partner\PartnerRequestBuilder;
@@ -54,6 +55,13 @@ class PuntjesClient extends BaseRequestBuilder
     */
     public function customers(): CustomersRequestBuilder {
         return new CustomersRequestBuilder($this->pathParameters, $this->requestAdapter);
+    }
+    
+    /**
+     * The giftCards property
+    */
+    public function giftCards(): GiftCardsRequestBuilder {
+        return new GiftCardsRequestBuilder($this->pathParameters, $this->requestAdapter);
     }
     
     /**

@@ -31,6 +31,13 @@ enum ErrorCode: string
     case ExternalIdNotFound = 'EXTERNAL_ID_NOT_FOUND';
     case FeatureNotEnabled = 'FEATURE_NOT_ENABLED';
     case Forbidden = 'FORBIDDEN';
+    case GiftCardAlreadyLoaded = 'GIFT_CARD_ALREADY_LOADED';
+    case GiftCardAmountLeftTooLow = 'GIFT_CARD_AMOUNT_LEFT_TOO_LOW';
+    case GiftCardAmountOutOfBounds = 'GIFT_CARD_AMOUNT_OUT_OF_BOUNDS';
+    case GiftCardCancelled = 'GIFT_CARD_CANCELLED';
+    case GiftCardEnded = 'GIFT_CARD_ENDED';
+    case GiftCardNotFound = 'GIFT_CARD_NOT_FOUND';
+    case GiftCardUndoNotAllowed = 'GIFT_CARD_UNDO_NOT_ALLOWED';
     case IdempotencyKeyConflict = 'IDEMPOTENCY_KEY_CONFLICT';
     case IdentifierDuplicate = 'IDENTIFIER_DUPLICATE';
     case InsufficientBalance = 'INSUFFICIENT_BALANCE';
@@ -95,6 +102,13 @@ enum ErrorCode: string
             self::ExternalIdNotFound => 404,
             self::FeatureNotEnabled => 403,
             self::Forbidden => 403,
+            self::GiftCardAlreadyLoaded => 422,
+            self::GiftCardAmountLeftTooLow => 422,
+            self::GiftCardAmountOutOfBounds => 422,
+            self::GiftCardCancelled => 422,
+            self::GiftCardEnded => 422,
+            self::GiftCardNotFound => 404,
+            self::GiftCardUndoNotAllowed => 422,
             self::IdempotencyKeyConflict => 422,
             self::IdentifierDuplicate => 409,
             self::InsufficientBalance => 422,
